@@ -119,6 +119,15 @@ class WorkState(unittest.TestCase):
         engine.add_event('go', ['scope1:first->second'])
         engine.add_event('goo', ['scope1:*->third'])
         engine.validate()
+        self.assertEqual(clean_dot(engine_graph(engine)), set([
+            'scope1:first',
+            'scope1:second',
+            'scope1:third',
+            'scope1:*',
+            'scope1:first -> scope1:second',
+            'scope1:* -> scope1:third',
+
+        ]))
 
     def test_event_already_defined(self):
         engine = Engine()
@@ -159,6 +168,14 @@ class WorkState(unittest.TestCase):
         engine.add_event('bad', ['scope1:first->third'])
         engine.add_event('go', ['scope1:first->second', 'scope1:third->second'])
         engine.validate()
+        self.assertEqual(clean_dot(engine_graph(engine)), set([
+            'scope1:first',
+            'scope1:second',
+            'scope1:third',
+            'scope1:first -> scope1:second',
+            'scope1:first -> scope1:third',
+            'scope1:third -> scope1:second',
+        ]))
 
     def test_validator_handles_loops(self):
         engine = Engine()
@@ -170,6 +187,15 @@ class WorkState(unittest.TestCase):
         engine.add_event('retry', ['scope1:second->third'])
         engine.add_event('go', ['scope1:first->second', 'scope1:third->second'])
         engine.validate()
+        self.assertEqual(clean_dot(engine_graph(engine)), set([
+            'scope1:first',
+            'scope1:second',
+            'scope1:third',
+            'scope1:first -> scope1:second',
+            'scope1:first -> scope1:first',
+            'scope1:third -> scope1:second',
+            'scope1:second -> scope1:third',
+        ]))
 
     def test_duplicate_transition(self):
         engine = Engine()
