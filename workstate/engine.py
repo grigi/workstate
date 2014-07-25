@@ -5,9 +5,11 @@ try:
 except ImportError:
     from ordereddict import OrderedDict #pylint: disable=F0401
 
-State = namedtuple('State', 'scope state source_edges dest_edges events doc')
+from workstate.docgen import engine_graph, scope_graph
+
+State = namedtuple('State', 'scope state source_edges dest_edges events triggers doc')
 Transition = namedtuple('Transition', 'scope from_state to_state condition transitions doc')
-Event = namedtuple('Event', 'event transitions condition doc')
+Event = namedtuple('Event', 'event transitions doc')
 
 class Engine(object):
     '''Workstate Engine'''
@@ -23,11 +25,11 @@ class Engine(object):
         '''Returns engine spec as dict'''
         return dict(scopes=self.scopes, states=self.states, transs=self.transitions, events=self.events)
 
-    def add_event(self, event, transitions, condition=None, doc=None):
-        '''Registers an event that fires on a condition of a set of states'''
+    def add_event(self, event, transitions, doc=None):
+        '''Registers an event that fires a set of states'''
         if event in self.events.keys():
             raise Exception("Event %s already defined" % event)
-        _event = Event(event, transitions, condition, doc)
+        _event = Event(event, transitions, doc)
         for transition in transitions:
             _transition = self.transitions.get(transition, None)
             if not _transition:
@@ -37,10 +39,22 @@ class Engine(object):
 
         self.events[event] = _event
 
+    def add_trigger(self, event, states, condition):
+        '''Registers triggers that fire an event at one of the states if condition is met'''
+        pass
+
     def validate(self):
         '''Validates entire WorkState Engine'''
-        for scope in self.scopes.values():
-            scope.validate()
+        for _scope in self.scopes.values():
+            _scope.validate()
+
+    def graph(self):
+        '''Returns Digraph object for entire Engine'''
+        return engine_graph(self)
+
+    def scope(self, *args, **kwargs):
+        '''Generates and returns a Scope object'''
+        return Scope(self, *args, **kwargs)
 
 class Scope(object):
     '''WorkState Scope'''
@@ -130,7 +144,7 @@ class Scope(object):
     def ensure_state(self, state, doc=None):
         '''Registers a state in the Scope'''
         if state not in self.states:
-            _state = State(self.scope, state, [], [], [], doc)
+            _state = State(self.scope, state, [], [], [], [], doc)
             self.states[state] = _state
             self.engine.states['%s:%s' % (self.scope, state)] = _state
 
@@ -167,3 +181,12 @@ class Scope(object):
         self.engine.transitions[transname] = _transition
         self.states[from_state].dest_edges.append(to_state)
         self.states[to_state].source_edges.append(from_state)
+
+    def graph(self):
+        '''Returns Digraph object for current Scope'''
+        return scope_graph(self)
+
+    def set_state_property(self, get_state, set_state):
+        '''Sets the state property'''
+        pass
+
