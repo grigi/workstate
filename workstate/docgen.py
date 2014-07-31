@@ -45,7 +45,7 @@ class Digraph(object):
         outf.write(image)
         outf.close()
 
-def scope_graph(scope, dot=None, col=0):
+def scope_graph(scope, dot=None, col=0, trigger_edges=False):
     '''Generates dot graph for provided scope'''
 
     def canon(val):
@@ -85,7 +85,7 @@ def engine_graph(engine):
 
     for idx, scope in enumerate(engine.scopes.values()):
         #dot.body.append('subgraph {')
-        scope_graph(scope, dot, col=idx+1)
+        scope_graph(scope, dot, col=idx+1, trigger_edges=True)
         #dot.body.append('}')
 
     return dot

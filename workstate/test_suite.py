@@ -10,7 +10,7 @@ try:
 except ImportError:
     import unittest
 
-#from pprint import pprint
+from pprint import pprint
 
 
 '''engine = Engine()
@@ -74,6 +74,7 @@ doc.set_state_property(get_doc_state, set_doc_state)
 #)
 
 engine.validate()
+pprint(engine.dict())
 #doc.graph().render('quote.png')
 print engine.graph()#.render('engine.png')
 

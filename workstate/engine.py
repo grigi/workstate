@@ -9,7 +9,8 @@ from workstate.docgen import engine_graph, scope_graph
 
 State = namedtuple('State', 'scope state source_edges dest_edges events triggers doc')
 Transition = namedtuple('Transition', 'scope from_state to_state condition transitions doc')
-Event = namedtuple('Event', 'event transitions doc')
+Event = namedtuple('Event', 'event transitions triggers doc')
+Trigger = namedtuple('Trigger', 'event states condition doc')
 
 class Engine(object):
     '''Workstate Engine'''
@@ -29,7 +30,7 @@ class Engine(object):
         '''Registers an event that fires a set of states'''
         if event in self.events.keys():
             raise Exception("Event %s already defined" % event)
-        _event = Event(event, transitions, doc)
+        _event = Event(event, transitions, [], doc)
         for transition in transitions:
             _transition = self.transitions.get(transition, None)
             if not _transition:
@@ -39,9 +40,15 @@ class Engine(object):
 
         self.events[event] = _event
 
-    def add_trigger(self, event, states, condition):
+    def add_trigger(self, event, states, condition, doc=None):
         '''Registers triggers that fire an event at one of the states if condition is met'''
-        pass
+        # check that event exists
+        # check that *states exists
+        # check that for event->*states combinations there is no previously existing
+        _trigger = Trigger(event, states, condition, doc)
+        self.events[event].triggers.append(_trigger)
+        for _state in states:
+            self.states[_state].triggers.append(_trigger)
 
     def validate(self):
         '''Validates entire WorkState Engine'''
@@ -76,12 +83,7 @@ class Scope(object):
     def get_event_map(self):
         '''Returns event to transitions map'''
         transs = [trans for val in self.engine.events.values() for trans in val.transitions]
-        events = [(trans, [val.event.replace('_', ' ').title() for val in self.engine.events.values() if trans in val.transitions]) for trans in transs]
-        # Bah! py26 doesn't support dict evaluations!
-        ret = {}
-        for key, val in events:
-            ret[key] = val
-        return ret
+        return dict((trans, [val.event.replace('_', ' ').title() for val in self.engine.events.values() if trans in val.transitions]) for trans in transs)
 
     def order_states(self):
         '''Returns a list of states ordered from initial node to termination nodes'''
