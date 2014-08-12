@@ -76,14 +76,14 @@ class Book(Scope):
         all_approved = ['draft__published']
         cancel = ['*__canceled']
 
-    '''class Triggers:
+    class Triggers:
         @trigger('all_approved', ['chapter:approved'])
         def publish_book(self):
             'Publishes book if all chapters are approved'
             for chapter in self.get_chapter():
                 if chapter.state != 'approved':
                     return False
-            return True'''
+            return True
 
     # pylint: enable=E1101,R0903,C1001,C0111,W0232
 

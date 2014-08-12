@@ -104,8 +104,11 @@ class Triggers(object):
         _event.triggers.append(name)
 
         for state in states:
-            _state = self.states.get_state(state)
-            _state.triggers.append(name)
+            try:
+                _state = self.states.get_state(state)
+                _state.triggers.append(name)
+            except KeyError:
+                pass
 
     def __repr__(self):
         return repr(self.triggers)
@@ -282,7 +285,7 @@ class Scope(object):
             return states.states.keys()
 
     @classmethod
-    def graph(cls, dot=None, col=0, trigger_edges=False):
+    def _graph_scope(cls, dot=None, col=0):
         '''Generates dot graph for provided scope'''
 
         if not dot:
@@ -296,6 +299,8 @@ class Scope(object):
 
         def canon(val):
             '''Returns canonical edge name'''
+            if ':' in val:
+                return val
             return cls.get_scope()+':'+val
 
         for fullstate in cls.order_states():
@@ -315,10 +320,6 @@ class Scope(object):
                     if trigger:
                         tname = trigger[0].split(':')[1]
                         dot.edge(canon(edge.from_state), canon(edge.to_state), pevent+' <SUP><FONT POINT-SIZE="10">('+tname+')</FONT></SUP>', style=style, color=FGCOLORS[col])
-                        if trigger_edges:
-                            for t in trigger[1]:
-                                if t!=edge.from_state:
-                                    dot.edge(canon(t), canon(edge.to_state), '<FONT POINT-SIZE="10">'+tname+'</FONT>', style="dotted", color=FGCOLORS[col])
                     else:
                         dot.edge(canon(edge.from_state), canon(edge.to_state), pevent, style=style, color=FGCOLORS[col])
             else:
@@ -332,6 +333,44 @@ class Scope(object):
 
         return dot
 
+    @classmethod
+    def _graph_triggers(cls, dot, col=0):
+        '''Generates dot graph for provided scope'''
+
+        initial = cls.get_initial()
+        transitions = cls.get_parsed()['transs'].transitions
+        events = cls.get_event_map()
+        triggers = dict([(a.event, (b,a.states)) for b,a in cls.get_parsed()['trigrs'].triggers.items()])
+
+        def canon(val):
+            '''Returns canonical edge name'''
+            if ':' in val:
+                return val
+            return cls.get_scope()+':'+val
+
+
+        for name, edge in transitions.items():
+            if edge.from_state != '*':
+                for event in events[name]:
+                    trigger = triggers.get(event, None)
+                    if trigger:
+                        tname = trigger[0].split(':')[1]
+                        for t in trigger[1]:
+                            if t!=edge.from_state:
+                                dot.edge(canon(t), canon(edge.to_state), '<FONT POINT-SIZE="10">'+tname+'</FONT>', style="dotted", color=FGCOLORS[col])
+
+        return dot
+
+
+    @classmethod
+    def graph(cls, dot=None, col=0, trigger_edges=False):
+        '''Generates dot graph for provided scope'''
+
+        dot = cls._graph_scope(dot, col)
+        if trigger_edges:
+            cls._graph_triggers(dot, col)
+
+        return dot
 
 class EngineMeta(type):
     def __new__(mcs, name, parents, dct):
@@ -354,12 +393,14 @@ class Engine(object):
 
         dot = Digraph()
 
-        for idx, scope in enumerate(reversed(cls.scopes)):
+        for idx, scope in enumerate(cls.scopes):
             dot.body.append('subgraph cluster_%s {' % idx)
             dot.body.append('label="%s"' % scope.get_scope().title())
             dot.body.append('color="%s"' % FGCOLORS[idx+1])
-            scope.graph(dot, col=idx+1, trigger_edges=True)
+            scope._graph_scope(dot, col=idx+1)
             dot.body.append('}')
+        for idx, scope in enumerate(cls.scopes):
+            scope._graph_triggers(dot, col=idx+1)
 
         return dot
 
