@@ -103,11 +103,14 @@ class BookEngine(Engine):
 
 #pprint(Chapter.get_parsed())
 Chapter.validate()
-#pprint(Book.get_parsed())
-#Book.validate()
 print(Chapter.graph())
 Chapter.graph().render('chapter.png')
-
+#pprint(Book.get_parsed())
+Book.validate()
+print(Book.graph())
+Book.graph().render('book.png')
+print(BookEngine.graph())
+BookEngine.graph().render('bookengine.png')
 
 
 """

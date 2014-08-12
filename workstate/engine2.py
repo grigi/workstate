@@ -307,7 +307,7 @@ class Scope(object):
         for name, edge in transitions.items():
             if edge.from_state != '*':
                 for event in events[name]:
-                    dot.edge(canon(edge.from_state), canon(edge.to_state), event, color=FGCOLORS[col])
+                    dot.edge(canon(edge.from_state), canon(edge.to_state), event, style="dashed" if edge.condition else "solid", color=FGCOLORS[col])
             else:
                 wildcards.add(edge.to_state)
 
@@ -334,6 +334,21 @@ class EngineMeta(type):
 @add_metaclass(EngineMeta)
 class Engine(object):
     __ignore_me__ = True
+
+    @classmethod
+    def graph(cls):
+        '''Generates dot graph for whole engine'''
+
+        dot = Digraph()
+
+        for idx, scope in enumerate(reversed(cls.scopes)):
+            dot.body.append('subgraph cluster_%s {' % idx)
+            dot.body.append('label="%s"' % scope.get_scope().title())
+            dot.body.append('color="%s"' % FGCOLORS[idx+1])
+            scope.graph(dot, col=idx+1, trigger_edges=True)
+            dot.body.append('}')
+
+        return dot
 
 
 def trigger(event, states):
