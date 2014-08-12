@@ -329,7 +329,8 @@ class Scope(object):
             dot.node(canon('*'), 'Any', shape='none', style="filled", fillcolor=BGCOLORS[col], color=FGCOLORS[col])
             for dest in wildcards:
                 for event in events['%s:*__%s' % (cls.get_scope(), dest)]:
-                    dot.edge(canon('*'), canon(dest), event, color=FGCOLORS[col])
+                    pevent = event.replace('_', ' ').title()
+                    dot.edge(canon('*'), canon(dest), pevent, color=FGCOLORS[col])
 
         return dot
 
