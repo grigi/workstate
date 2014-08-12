@@ -5,10 +5,10 @@ from setuptools import setup
 import workstate
 
 if sys.version_info[0:2] == (2, 6):
-    DEPS = ['ordereddict']
+    DEPS = ['ordereddict', 'six']
     TEST_DEPS = ['unittest2']
 else:
-    DEPS = []
+    DEPS = ['six']
     TEST_DEPS = []
 
 setup(
