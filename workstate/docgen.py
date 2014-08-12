@@ -16,7 +16,7 @@ class Digraph(object):
         result = []
 
         if label:
-            result.append('label="%s"' % label)
+            result.append('label=<%s>' % label)
 
         if kwargs:
             result.extend(['%s="%s"' % (k, v) for k, v in sorted(kwargs.items()) if v])

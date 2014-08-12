@@ -291,6 +291,8 @@ class Scope(object):
         initial = cls.get_initial()
         transitions = cls.get_parsed()['transs'].transitions
         events = cls.get_event_map()
+        triggers = dict([(a.event, (b,a.states)) for b,a in cls.get_parsed()['trigrs'].triggers.items()])
+        #print(triggers)
 
         def canon(val):
             '''Returns canonical edge name'''
@@ -300,14 +302,25 @@ class Scope(object):
             state = fullstate.split(':')[1]
             pretty = state.replace('_', ' ').title()
             if state == initial:
-                dot.node(fullstate, "*"+pretty, shape='oval', rank="max", style="bold,filled", fillcolor=BGCOLORS[col], color=FGCOLORS[col])
+                dot.node(fullstate, pretty, shape='oval', rank="max", style="bold,filled", fillcolor=BGCOLORS[col], color=FGCOLORS[col])
             else:
                 dot.node(fullstate, pretty, shape='rectangle', style="filled,rounded", fillcolor=BGCOLORS[col], color=FGCOLORS[col])
 
         for name, edge in transitions.items():
             if edge.from_state != '*':
                 for event in events[name]:
-                    dot.edge(canon(edge.from_state), canon(edge.to_state), event, style="dashed" if edge.condition else "solid", color=FGCOLORS[col])
+                    trigger = triggers.get(event, None)
+                    pevent = event.replace('_', ' ').title()
+                    style = "dashed" if edge.condition else "solid"
+                    if trigger:
+                        tname = trigger[0].split(':')[1]
+                        dot.edge(canon(edge.from_state), canon(edge.to_state), pevent+' <SUP><FONT POINT-SIZE="10">('+tname+')</FONT></SUP>', style=style, color=FGCOLORS[col])
+                        if trigger_edges:
+                            for t in trigger[1]:
+                                if t!=edge.from_state:
+                                    dot.edge(canon(t), canon(edge.to_state), '<FONT POINT-SIZE="10">'+tname+'</FONT>', style="dotted", color=FGCOLORS[col])
+                    else:
+                        dot.edge(canon(edge.from_state), canon(edge.to_state), pevent, style=style, color=FGCOLORS[col])
             else:
                 wildcards.add(edge.to_state)
 
