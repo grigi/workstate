@@ -34,10 +34,10 @@ class Chapter(Scope):
             return self.marked
 
     class Events:
-        propose = ['draft__proposed']
+        propose = "Propose the draft for review", ['draft__proposed']
         approve = ['proposed__approved']
         reject = ['proposed__draft']
-        cancel = ['*__canceled']
+        cancel = ['*__canceled'], "Cancel the chapter"
 
     class Triggers:
         @trigger('reject', ['proposed'])

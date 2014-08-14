@@ -164,7 +164,18 @@ class ScopeMeta(type):
                 dct_events = dct['Events']
                 eventkeys = [key for key in dir(dct_events) if not key.startswith('__')]
                 for key in eventkeys:
-                    events.update_event(key, getattr(dct_events, key))
+                    val = getattr(dct_events, key)
+                    if isinstance(val, list):
+                        events.update_event(key, val)
+                    elif isinstance(val, tuple):
+                        try:
+                            if len(val) != 2:
+                                raise IndexError
+                            edges = [a for a in val if isinstance(a, list)][0]
+                            doc = [a for a in val if isinstance(a, str)][0]
+                        except IndexError:
+                            raise Exception('Events need to be one of: [], ("",[]), ([],"")')
+                        events.update_event(key, edges, doc)
 
             if 'Triggers' in dct:
                 dct_trigrs = dct['Triggers']
