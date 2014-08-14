@@ -11,7 +11,7 @@ try:
 except ImportError:
     import unittest
 
-
+"""
 
 class Chapter(Scope):
     'A chapter'
@@ -103,81 +103,16 @@ class BookEngine(Engine):
 
 #pprint(Chapter.get_parsed())
 Chapter.validate()
-print(Chapter.graph())
+#print(Chapter.graph())
 Chapter.graph().render('chapter.png')
 #pprint(Book.get_parsed())
 Book.validate()
-print(Book.graph())
+#print(Book.graph())
 Book.graph().render('book.png')
-print(BookEngine.graph())
+BookEngine.validate()
+#print(BookEngine.graph())
 BookEngine.graph().render('bookengine.png')
-
-
 """
-'''engine = Engine()
-quote = engine.scope('quote', initial='draft')
-quote.add_transition('in_progress', 'ready')
-quote.add_transition(['draft', 'ready'], 'in_progress')
-quote.add_transition('ready', 'done')
-quote.add_transition('done', 'in_progress')
-quote.add_transition('*', 'cancelled')
-
-engine.add_event('edit', ['quote:done->in_progress', 'quote:draft->in_progress', 'quote:ready->in_progress'])
-engine.add_event('moo', ['quote:draft->in_progress'])
-engine.add_event('complete', ['quote:in_progress->ready'])
-engine.add_event('finish', ['quote:ready->done'])
-engine.add_event('cancel', ['quote:*->cancelled'])
-
-scope1 = engine.scope('scope1', initial='first')
-scope1.add_transition('first', 'second')
-scope2 = engine.scope('scope2', initial='first')
-scope2.add_transition('first', 'second')
-engine.add_event('go', ['scope1:first->second', 'scope2:first->second'])
-
-
-engine.validate()
-
-#pprint(engine.dict())
-
-scope_graph(quote).render('quote.png')
-engine.graph().render('engine.png')'''
-
-
-engine = Engine()
-doc = engine.scope('doc', initial='draft')
-
-def check_marked(obj):
-    return obj.get('marked', False)
-
-doc.add_transition('proposed', 'approved', condition=check_marked)
-doc.add_transition('draft', 'proposed')
-doc.add_transition('proposed', 'draft')
-
-engine.add_event('propose', ['doc:draft->proposed'])
-engine.add_event('approve', ['doc:proposed->approved'])
-engine.add_event('reject', ['doc:proposed->draft'])
-
-def check_complete(obj):
-    return obj.get('complete', False)
-
-engine.add_trigger('reject', ['doc:proposed'], condition=check_complete)
-
-def get_doc_state(obj):
-    return obj.get('state', doc.initial)
-
-def set_doc_state(obj, state):
-    obj['state'] = state
-
-doc.set_state_property(get_doc_state, set_doc_state)
-#doc.set_state_property(
-    #lambda obj: obj.get('state', doc.initial),  # getter
-    #lambda obj: obj['state'] = state            # setter
-#)
-
-engine.validate()
-pprint(engine.dict())
-#doc.graph().render('quote.png')
-print engine.graph()#.render('engine.png')
 
 def clean_dot(dot):
     '''Cleans out formatting from dot input'''
@@ -187,27 +122,35 @@ class WorkState(unittest.TestCase):
     '''Tests basic WorkState constructs'''
 
     def test_empty_engine(self):
-        engine = Engine()
-        engine.validate()
-        self.assertEqual(clean_dot(engine.graph()), set())
+        with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
+            class TestEngine(Engine):
+                pass
+
+    def test_engine_scope_non_list(self):
+        with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
+            class TestEngine(Engine):
+                scopes = "moo"
+
+    def test_engine_scope_non_scopes(self):
+        with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
+            class TestEngine(Engine):
+                scopes = ["moo"]
 
     def test_empty_scope(self):
-        engine = Engine()
-        scope1 = engine.scope('scope1')
-        engine.validate()
-        self.assertEqual(clean_dot(engine.graph()), set())
-        self.assertEqual(clean_dot(scope1.graph()), set())
+        class Scope1(Scope):
+            pass
+        Scope1.validate()
+        self.assertEqual(clean_dot(Scope1.graph()), set())
 
     def test_initial_scope(self):
-        engine = Engine()
-        scope1 = engine.scope('scope1', initial='first')
-        engine.validate()
-        self.assertEqual(clean_dot(engine.graph()), set([
+        class Scope1(Scope):
+            initial = 'first'
+        Scope1.validate()
+        self.assertEqual(clean_dot(Scope1.graph()), set([
             'scope1:first',
         ]))
-        self.assertEqual(clean_dot(scope1.graph()), clean_dot(engine.graph()))
 
-    def test_scope_edge_event(self):
+    """def test_scope_edge_event(self):
         engine = Engine()
         scope1 = engine.scope('scope1', initial='first')
         scope1.add_transition('first', 'second')
@@ -361,6 +304,8 @@ class WorkState(unittest.TestCase):
         os.remove(fname)
         self.assertIn('PNG image', result.decode('UTF-8'))
 
+"""
+
 if __name__ == '__main__':
     unittest.main()
-"""
+

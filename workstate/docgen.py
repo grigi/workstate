@@ -34,7 +34,7 @@ class Digraph(object):
         self.body.append('\t\t"%s" -> "%s"%s' % (tail_name, head_name, self.attributes(label, kwargs)))
 
     def __str__(self):
-        return 'digraph {\nrankdir="LR"\ndpi=120\n' + '\n'.join(self.body) + '\n}'
+        return 'digraph {\nrankdir="LR"\ndpi=120\noverlap_shrink=true\noverlap=prism0\nsize=12\n' + '\n'.join(self.body) + '\n}'
 
     def render(self, filename):
         '''Renders graph to filename as a PNG'''

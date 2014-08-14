@@ -117,7 +117,7 @@ class Triggers(object):
 class ScopeMeta(type):
     def __new__(mcs, name, parents, dct):
 
-        if '__ignore_me__' not in dct:
+        if '__the_base_class__' not in dct:
             #print(name, list(dct.keys()))
 
             # create a class_id if it's not specified
@@ -143,6 +143,9 @@ class ScopeMeta(type):
                 statekeys = [key for key in dir(dct_states) if not key.startswith('__')]
                 for key in statekeys:
                     states.ensure_state(key, doc=getattr(dct_states, key))
+
+            if 'initial' in dct:
+                states.ensure_state(scope+':'+dct['initial'])
 
             if 'Transitions' in dct:
                 dct_transs = dct['Transitions']
@@ -175,22 +178,26 @@ class ScopeMeta(type):
 
 @add_metaclass(ScopeMeta)
 class Scope(object):
-    __ignore_me__ = True
+    __the_base_class__ = True
 
     @classmethod
     def get_parsed(cls):
+        '''returns the parsed translation lookup'''
         return getattr(cls, '__parsed')
 
     @classmethod
     def get_initial(cls):
+        '''Returns the initial state'''
         return getattr(cls, 'initial', None)
 
     @classmethod
     def get_scope(cls):
+        '''Returns the current scope'''
         return getattr(cls, 'scope')
 
     @classmethod
     def get_event_map(cls):
+        '''Maps edges to transitions'''
         _events = cls.get_parsed()['events'].events
         _transitions = cls.get_parsed()['transs']
 
@@ -205,6 +212,7 @@ class Scope(object):
 
     @classmethod
     def validate(cls):
+        '''Validates the Scope'''
         scope = cls.get_scope()
         _states = cls.get_parsed()['states'].states
         _transitions = cls.get_parsed()['transs']
@@ -249,6 +257,7 @@ class Scope(object):
 
     @classmethod
     def order_states(cls):
+        '''Orders states from initial to end-states if initial is set'''
         states = cls.get_parsed()['states'].states
         initial = cls.get_initial()
         if initial:
@@ -282,7 +291,7 @@ class Scope(object):
 
             return order
         else:
-            return states.states.keys()
+            return states.keys()
 
     @classmethod
     def _graph_scope(cls, dot=None, col=0):
@@ -295,7 +304,6 @@ class Scope(object):
         transitions = cls.get_parsed()['transs'].transitions
         events = cls.get_event_map()
         triggers = dict([(a.event, (b,a.states)) for b,a in cls.get_parsed()['trigrs'].triggers.items()])
-        #print(triggers)
 
         def canon(val):
             '''Returns canonical edge name'''
@@ -336,9 +344,8 @@ class Scope(object):
 
     @classmethod
     def _graph_triggers(cls, dot, col=0):
-        '''Generates dot graph for provided scope'''
+        '''Generates dot graph for non-edge triggers'''
 
-        initial = cls.get_initial()
         transitions = cls.get_parsed()['transs'].transitions
         events = cls.get_event_map()
         triggers = dict([(a.event, (b,a.states)) for b,a in cls.get_parsed()['trigrs'].triggers.items()])
@@ -376,17 +383,22 @@ class Scope(object):
 class EngineMeta(type):
     def __new__(mcs, name, parents, dct):
 
-        if '__ignore_me__' not in dct:
-            #print(name, dct.keys())
-            pass
+        if '__the_base_class__' not in dct:
+            if 'scopes' not in dct or not isinstance(dct['scopes'], list):
+                raise Exception("Engine needs scopes defined as a scope list")
+            for scope in dct['scopes']:
+                if '__parsed' not in dir(scope):
+                    raise Exception("Engine needs scopes defined as a scope list")
 
-        # we need to call type.__new__ to complete the initialization
+        # TODO: Merge __parsed translations lookups
+
+        # we need to call type.__new__ zto complete the initialization
         return type.__new__(mcs, name, parents, dct)
 
 
 @add_metaclass(EngineMeta)
 class Engine(object):
-    __ignore_me__ = True
+    __the_base_class__ = True
 
     @classmethod
     def graph(cls):
@@ -404,6 +416,14 @@ class Engine(object):
             scope._graph_triggers(dot, col=idx+1)
 
         return dot
+
+    @classmethod
+    def validate(cls):
+        # Validate nodes, edges and states
+        for scope in cls.scopes:
+            scope.validate()
+
+        # TODO: Validate triggers
 
 
 def trigger(event, states):
