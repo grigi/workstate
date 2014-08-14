@@ -11,8 +11,9 @@ try:
 except ImportError:
     import unittest
 
+# pylint: disable=C1001,W0232,C0111,R0903
 
-
+"""
 class Chapter(Scope):
     'A chapter'
     # pylint: disable=E1101,R0903,C1001,C0111,W0232
@@ -112,7 +113,7 @@ Book.graph().render('book.png')
 BookEngine.validate()
 #print(BookEngine.graph())
 BookEngine.graph().render('bookengine.png')
-
+"""
 
 def clean_dot(dot):
     '''Cleans out formatting from dot input'''
@@ -122,12 +123,14 @@ class ScopeTest(unittest.TestCase):
     '''Tests basic Scope constructs'''
 
     def test_empty_scope(self):
+        '''Scope: Empty'''
         class Scope1(Scope):
             pass
         Scope1.validate()
         self.assertEqual(clean_dot(Scope1.graph()), set())
 
     def test_initial_scope(self):
+        '''Scope: Initial only'''
         class Scope1(Scope):
             initial = 'first'
         Scope1.validate()
@@ -136,6 +139,7 @@ class ScopeTest(unittest.TestCase):
         ]))
 
     def test_scope_edge_noevent(self):
+        '''Scope: Edge without event'''
         class Scope1(Scope):
             initial = 'first'
             class Transitions:
@@ -149,10 +153,11 @@ class ScopeTest(unittest.TestCase):
         ]))
 
     def test_scope_edge_event(self):
+        '''Scope: Edge with event'''
         class Scope1(Scope):
             initial = 'first'
             class Events:
-                go = ['first__second']
+                goo = ['first__second']
         Scope1.validate()
         self.assertEqual(clean_dot(Scope1.graph()), set([
             'scope1:first',
@@ -161,19 +166,21 @@ class ScopeTest(unittest.TestCase):
         ]))
 
     def test_scope_loose_states(self):
+        '''Scope: Disconnected states'''
         class Scope1(Scope):
             initial = 'first'
             class Events:
-                go = ['first__second', 'third__fourth']
+                goo = ['first__second', 'third__fourth']
         with self.assertRaisesRegexp(Exception, 'States.*not reachable'):
             Scope1.validate()
 
     def test_wildcard_edge(self):
+        '''Scope: Wildcard edge'''
         class Scope1(Scope):
             initial = 'first'
             class Events:
-                go = ['first__second']
-                goo = ['*__third']
+                goo = ['first__second']
+                gaa = ['*__third']
         Scope1.validate()
         self.assertEqual(clean_dot(Scope1.graph()), set([
             'scope1:first',
@@ -186,6 +193,7 @@ class ScopeTest(unittest.TestCase):
         ]))
 
     def test_define_states(self):
+        '''Scope: Defining states'''
         class Scope1(Scope):
             initial = 'first'
             class States:
@@ -210,11 +218,12 @@ class ScopeTest(unittest.TestCase):
             Scope1.validate()
 
     def test_listed_transition(self):
+        '''Scope: Defining many transitions in one List'''
         class Scope1(Scope):
             initial = 'first'
             class Events:
                 bad = ['first__third']
-                go = ['first__second', 'third__second']
+                goo = ['first__second', 'third__second']
         Scope1.validate()
         self.assertEqual(clean_dot(Scope1.graph()), set([
             'scope1:first',
@@ -226,12 +235,13 @@ class ScopeTest(unittest.TestCase):
         ]))
 
     def test_validator_handles_loops(self):
+        '''Scope: Validator doesn't choke on loops'''
         class Scope1(Scope):
             initial = 'first'
             class Events:
                 delay = ['first__first']
                 retry = ['second__third']
-                go = ['first__second', 'third__second']
+                goo = ['first__second', 'third__second']
         Scope1.validate()
         self.assertEqual(clean_dot(Scope1.graph()), set([
             'scope1:first',
@@ -244,11 +254,12 @@ class ScopeTest(unittest.TestCase):
         ]))
 
     def test_scope_generate_png(self):
+        '''Scope: Generate PNG graph'''
         class Scope1(Scope):
             initial = 'first'
             class Events:
-                go = ['first__second']
-                goo = ['*__third']
+                goo = ['first__second']
+                gaa = ['*__third']
         Scope1.validate()
         fname = '/tmp/%s.png' % uuid.uuid4()
         Scope1.graph().render(fname)
@@ -256,30 +267,40 @@ class ScopeTest(unittest.TestCase):
         os.remove(fname)
         self.assertIn('PNG image', result.decode('UTF-8'))
 
+    # TODO: conditional transitions
+
+    # TODO: Triggers
+
+    # TODO: scoped names vs unscoped names
+
 
 class EngineTest(unittest.TestCase):
     '''Tests basic Engine constructs'''
 
     def test_empty_engine(self):
+        '''Engine: Empty'''
         with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
             class TestEngine(Engine):
                 pass
 
     def test_engine_scope_non_list(self):
+        '''Engine: scopes not in a List'''
         with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
             class TestEngine(Engine):
                 scopes = "moo"
 
     def test_engine_scope_non_scopes(self):
+        '''Engine: List doesn't contain Scopes'''
         with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
             class TestEngine(Engine):
                 scopes = ["moo"]
 
     def test_scope_edge_event_engine_equal(self):
+        '''Engine: Wrapping a Scope in an Engine results in no change in model'''
         class Scope1(Scope):
             initial = 'first'
             class Events:
-                go = ['first__second']
+                goo = ['first__second']
         Scope1.validate()
         val1 = clean_dot(Scope1.graph())
         class TestEngine(Engine):
@@ -289,14 +310,15 @@ class EngineTest(unittest.TestCase):
         self.assertEqual(val1, val2)
 
     def test_two_scopes(self):
+        '''Engine: Merging two Scopes'''
         class Scope1(Scope):
             initial = 'first'
             class Events:
-                go = ['first__second']
+                goo = ['first__second']
         class Scope2(Scope):
             initial = 'first'
             class Events:
-                go = ['first__second']
+                goo = ['first__second']
         class TestEngine(Engine):
             scopes = [Scope1, Scope2]
         TestEngine.validate()
@@ -310,11 +332,12 @@ class EngineTest(unittest.TestCase):
         ]))
 
     def test_engine_generate_png(self):
+        '''Engine: Generate PNG graph'''
         class Scope1(Scope):
             initial = 'first'
             class Events:
-                go = ['first__second']
-                goo = ['*__third']
+                goo = ['first__second']
+                gaa = ['*__third']
         Scope1.validate()
         class TestEngine(Engine):
             scopes = [Scope1]
@@ -324,6 +347,10 @@ class EngineTest(unittest.TestCase):
         result = subprocess.Popen(['file', fname], stdout=subprocess.PIPE).communicate()[0]
         os.remove(fname)
         self.assertIn('PNG image', result.decode('UTF-8'))
+
+    # TODO: cross-scope Triggers
+
+    # TODO: cross-scope names
 
 
 if __name__ == '__main__':
