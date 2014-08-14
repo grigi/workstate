@@ -4,14 +4,14 @@ import subprocess
 import uuid
 from pprint import pprint
 
-from workstate.engine2 import *#Engine, Scope, trigger
+from workstate.engine import Engine, Scope, trigger
 
 try:
     import unittest2 as unittest #pylint: disable=F0401
 except ImportError:
     import unittest
 
-"""
+
 
 class Chapter(Scope):
     'A chapter'
@@ -112,7 +112,7 @@ Book.graph().render('book.png')
 BookEngine.validate()
 #print(BookEngine.graph())
 BookEngine.graph().render('bookengine.png')
-"""
+
 
 def clean_dot(dot):
     '''Cleans out formatting from dot input'''
