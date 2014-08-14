@@ -16,14 +16,17 @@ Event = namedtuple('Event', 'event transitions triggers doc')
 Trigger = namedtuple('Trigger', 'event states condition doc')
 
 class States(object):
+    '''State container'''
     def __init__(self, scope):
         self.scope = scope
         self.states = {}
 
     def fullname(self, name):
+        '''Returns canonical name'''
         return name if ':' in name else self.scope+':'+name
 
     def ensure_state(self, name, doc=None):
+        '''Ensures that a state exists'''
         fqsn = self.fullname(name)
 
         if fqsn not in self.states.keys():
@@ -33,6 +36,7 @@ class States(object):
         return self.states[fqsn]
 
     def get_state(self, name):
+        '''Return state object'''
         return self.states[self.fullname(name)]
 
     def __repr__(self):
@@ -40,12 +44,14 @@ class States(object):
 
 
 class Transitions(object):
+    '''Transition container'''
     def __init__(self, scope, states):
         self.scope = scope
         self.states = states
         self.transitions = {}
 
     def fullname(self, name):
+        '''Returne canonical name'''
         if ':' in name:
             return name
         else:
@@ -55,6 +61,7 @@ class Transitions(object):
             return self.scope+':'+from_state+'__'+to_state
 
     def ensure_transition(self, name, condition=None, doc=None):
+        '''Ensures that a transition exists'''
         fqsn = self.fullname(name)
 
         if fqsn not in self.transitions.keys():
@@ -74,11 +81,13 @@ class Transitions(object):
 
 
 class Events(object):
+    '''Event container'''
     def __init__(self, transs):
         self.transs = transs
         self.events = {}
 
     def update_event(self, name, transitions, doc=None):
+        '''Create/Update event with provided transitions'''
         _transitions = []
         for tran in transitions:
             _transitions.append(self.transs.ensure_transition(tran))
@@ -95,12 +104,14 @@ class Events(object):
 
 
 class Triggers(object):
+    '''Trigger container'''
     def __init__(self, events, states):
         self.events = events
         self.states = states
         self.triggers = {}
 
     def add_trigger(self, name, event, states, condition, doc=None):
+        '''Add a trigger condition'''
         name = self.states.fullname(name)
         _trigger = Trigger(event, states, condition, doc)
         self.triggers[name] = _trigger
@@ -119,8 +130,8 @@ class Triggers(object):
 
 
 class ScopeMeta(type):
+    '''Meta-Class for Scope'''
     def __new__(mcs, name, parents, dct):
-
         if '__the_base_class__' not in dct:
             # create a class_id if it's not specified
             if 'scope' not in dct:
@@ -191,6 +202,7 @@ class ScopeMeta(type):
 
 @add_metaclass(ScopeMeta)
 class Scope(object):
+    '''WorkState Scope'''
     __the_base_class__ = True
 
     @classmethod
@@ -307,16 +319,15 @@ class Scope(object):
             return states.keys()
 
     @classmethod
-    def _graph_scope(cls, dot=None, col=0):
+    def graph_scope(cls, dot=None, col=0):
         '''Generates dot graph for provided scope'''
-
         if not dot:
             dot = Digraph()
         wildcards = set()
         initial = cls.get_initial()
         transitions = cls.get_parsed()['transs'].transitions
         events = cls.get_event_map()
-        triggers = dict([(a.event, (b,a.states)) for b,a in cls.get_parsed()['trigrs'].triggers.items()])
+        triggers = dict([(a.event, (b, a.states)) for b, a in cls.get_parsed()['trigrs'].triggers.items()])
 
         def canon(val):
             '''Returns canonical edge name'''
@@ -336,12 +347,13 @@ class Scope(object):
             if edge.from_state != '*':
                 if name in events:
                     for event in events[name]:
-                        trigger = triggers.get(event, None)
+                        _trigger = triggers.get(event, None)
                         pevent = event.replace('_', ' ').title()
                         style = "dashed" if edge.condition else "solid"
-                        if trigger:
-                            tname = trigger[0].split(':')[1]
-                            dot.edge(canon(edge.from_state), canon(edge.to_state), pevent+' <SUP><FONT POINT-SIZE="10">('+tname+')</FONT></SUP>', style=style, color=FGCOLORS[col])
+                        if _trigger:
+                            tname = _trigger[0].split(':')[1]
+                            pretty = pevent+' <SUP><FONT POINT-SIZE="10">('+tname+')</FONT></SUP>'
+                            dot.edge(canon(edge.from_state), canon(edge.to_state), pretty, style=style, color=FGCOLORS[col])
                         else:
                             dot.edge(canon(edge.from_state), canon(edge.to_state), pevent, style=style, color=FGCOLORS[col])
                 else:
@@ -359,12 +371,11 @@ class Scope(object):
         return dot
 
     @classmethod
-    def _graph_triggers(cls, dot, col=0):
+    def graph_triggers(cls, dot, col=0):
         '''Generates dot graph for non-edge triggers'''
-
         transitions = cls.get_parsed()['transs'].transitions
         events = cls.get_event_map()
-        triggers = dict([(a.event, (b,a.states)) for b,a in cls.get_parsed()['trigrs'].triggers.items()])
+        triggers = dict([(a.event, (b, a.states)) for b, a in cls.get_parsed()['trigrs'].triggers.items()])
 
         def canon(val):
             '''Returns canonical edge name'''
@@ -376,12 +387,12 @@ class Scope(object):
         for name, edge in transitions.items():
             if edge.from_state != '*':
                 for event in events[name]:
-                    trigger = triggers.get(event, None)
-                    if trigger:
-                        tname = trigger[0].split(':')[1]
-                        for t in trigger[1]:
-                            if t!=edge.from_state:
-                                dot.edge(canon(t), canon(edge.to_state), '<FONT POINT-SIZE="10">'+tname+'</FONT>', style="dotted", color=FGCOLORS[col])
+                    _trigger = triggers.get(event, None)
+                    if _trigger:
+                        tname = _trigger[0].split(':')[1]
+                        for trig in _trigger[1]:
+                            if trig != edge.from_state:
+                                dot.edge(canon(trig), canon(edge.to_state), '<FONT POINT-SIZE="10">'+tname+'</FONT>', style="dotted", color=FGCOLORS[col])
 
         return dot
 
@@ -389,16 +400,15 @@ class Scope(object):
     @classmethod
     def graph(cls, dot=None, col=0, trigger_edges=False):
         '''Generates dot graph for provided scope'''
-
-        dot = cls._graph_scope(dot, col)
+        dot = cls.graph_scope(dot, col)
         if trigger_edges:
-            cls._graph_triggers(dot, col)
+            cls.graph_triggers(dot, col)
 
         return dot
 
 class EngineMeta(type):
+    '''Meta-Class for Engine'''
     def __new__(mcs, name, parents, dct):
-
         if '__the_base_class__' not in dct:
             if 'scopes' not in dct or not isinstance(dct['scopes'], list):
                 raise Exception("Engine needs scopes defined as a scope list")
@@ -414,38 +424,45 @@ class EngineMeta(type):
 
 @add_metaclass(EngineMeta)
 class Engine(object):
+    '''WorkState Engine'''
     __the_base_class__ = True
+
+    @classmethod
+    def get_scopes(cls):
+        '''Returns the current scope'''
+        return getattr(cls, 'scopes')
 
     @classmethod
     def graph(cls):
         '''Generates dot graph for whole engine'''
-
         dot = Digraph()
 
-        for idx, scope in enumerate(cls.scopes):
+        for idx, scope in enumerate(cls.get_scopes()):
             dot.body.append('subgraph cluster_%s {' % idx)
             dot.body.append('label="%s"' % scope.get_scope().title())
             dot.body.append('color="%s"' % FGCOLORS[idx+1])
-            scope._graph_scope(dot, col=idx+1)
+            scope.graph_scope(dot, col=idx+1)
             dot.body.append('}')
-        for idx, scope in enumerate(cls.scopes):
-            scope._graph_triggers(dot, col=idx+1)
+        for idx, scope in enumerate(cls.get_scopes()):
+            scope.graph_triggers(dot, col=idx+1)
 
         return dot
 
     @classmethod
     def validate(cls):
+        '''Validates the WorkState Engine'''
         # Validate nodes, edges and states
-        for scope in cls.scopes:
+        for scope in cls.get_scopes():
             scope.validate()
 
         # TODO: Validate triggers
 
 
 def trigger(event, states):
-    'Annotates the condition function with event and states attributes'
-    def _wrap(f):
-        f.event = event
-        f.states = states
-        return f
+    '''Annotates the condition function with event and states attributes'''
+    def _wrap(fun):
+        # pylint: disable=C0111
+        fun.event = event
+        fun.states = states
+        return fun
     return _wrap
