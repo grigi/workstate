@@ -11,38 +11,53 @@ WorkState is a self-documenting Workflow-event state management system.
 Usage
 -----
 
-Specifying workstate engine:
+A minimal example:
 
 .. code:: python
 
-    from workstate import Engine
+    from workstate.engine2 import Scope, Engine
 
-    engine = Engine()
-    doc = engine.scope('doc', initial='draft')
+    class Chapter(Scope):
+        'A chapter'
+        initial = 'draft'
 
-    def check_marked(obj):
-        return obj.get('marked', False)
+        class Transitions:
+            def proposed__approved(self):
+                'Chapter approved'
+                return self.marked
 
-    doc.add_transition('proposed', 'approved', condition=check_marked)
-    doc.add_transition('draft', 'proposed')
-    doc.add_transition('proposed', 'draft')
+        class Events:
+            propose = ['draft__proposed']
+            approve = ['proposed__approved']
+            reject = ['proposed__draft']
+            cancel = ['*__canceled']
 
-    engine.add_event('propose', ['doc:draft->proposed'])
-    engine.add_event('approve', ['doc:proposed->approved'])
-    engine.add_event('reject', ['doc:proposed->draft'])
+        class Triggers:
+            @trigger('reject', ['proposed'])
+            def check_complete(self):
+                'Rejects chapter if not complete when landing at proposed state'
+                return not self.complete
 
-    def check_complete(obj):
-        return obj.get('complete', False)
+    class Book(Scope):
+        'A book'
+        initial = 'draft'
 
-    engine.add_trigger('reject', ['doc:proposed'], condition=check_complete)
+        class Events:
+            all_approved = ['draft__published']
+            cancel = ['*__canceled']
 
-    def get_doc_state(obj):
-        return obj.get('state', doc.initial)
+        class Triggers:
+            @trigger('all_approved', ['chapter:approved'])
+            def publish_book(self):
+                'Publishes book if all chapters are approved'
+                for chapter in self.get_chapter():
+                    if chapter.state != 'approved':
+                        return False
+                return True
 
-    def set_doc_state(obj, state):
-        obj['state'] = state
+    class BookEngine(Engine):
+        scopes = [Book, Chapter]
 
-    doc.set_state_property(get_doc_state, set_doc_state)
 
 Using the engine:
 
