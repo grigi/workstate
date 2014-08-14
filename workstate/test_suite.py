@@ -118,23 +118,8 @@ def clean_dot(dot):
     '''Cleans out formatting from dot input'''
     return set([val.split('[')[0].replace('"', '').strip() for val in dot.body if '\t' in val])
 
-class WorkState(unittest.TestCase):
-    '''Tests basic WorkState constructs'''
-
-    def test_empty_engine(self):
-        with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
-            class TestEngine(Engine):
-                pass
-
-    def test_engine_scope_non_list(self):
-        with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
-            class TestEngine(Engine):
-                scopes = "moo"
-
-    def test_engine_scope_non_scopes(self):
-        with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
-            class TestEngine(Engine):
-                scopes = ["moo"]
+class ScopeTest(unittest.TestCase):
+    '''Tests basic Scope constructs'''
 
     def test_empty_scope(self):
         class Scope1(Scope):
@@ -175,19 +160,6 @@ class WorkState(unittest.TestCase):
             'scope1:first -> scope1:second',
         ]))
 
-    def test_scope_edge_event_engine_equal(self):
-        class Scope1(Scope):
-            initial = 'first'
-            class Events:
-                go = ['first__second']
-        Scope1.validate()
-        val1 = clean_dot(Scope1.graph())
-        class TestEngine(Engine):
-            scopes = [Scope1]
-        TestEngine.validate()
-        val2 = clean_dot(TestEngine.graph())
-        self.assertEqual(val1, val2)
-
     def test_scope_loose_states(self):
         class Scope1(Scope):
             initial = 'first'
@@ -195,27 +167,6 @@ class WorkState(unittest.TestCase):
                 go = ['first__second', 'third__fourth']
         with self.assertRaisesRegexp(Exception, 'States.*not reachable'):
             Scope1.validate()
-
-    def test_two_scopes(self):
-        class Scope1(Scope):
-            initial = 'first'
-            class Events:
-                go = ['first__second']
-        class Scope2(Scope):
-            initial = 'first'
-            class Events:
-                go = ['first__second']
-        class TestEngine(Engine):
-            scopes = [Scope1, Scope2]
-        TestEngine.validate()
-        self.assertEqual(clean_dot(TestEngine.graph()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope1:first -> scope1:second',
-            'scope2:first',
-            'scope2:second',
-            'scope2:first -> scope2:second',
-        ]))
 
     def test_wildcard_edge(self):
         class Scope1(Scope):
@@ -292,7 +243,7 @@ class WorkState(unittest.TestCase):
             'scope1:second -> scope1:third',
         ]))
 
-    def test_generate_png(self):
+    def test_scope_generate_png(self):
         class Scope1(Scope):
             initial = 'first'
             class Events:
@@ -301,6 +252,75 @@ class WorkState(unittest.TestCase):
         Scope1.validate()
         fname = '/tmp/%s.png' % uuid.uuid4()
         Scope1.graph().render(fname)
+        result = subprocess.Popen(['file', fname], stdout=subprocess.PIPE).communicate()[0]
+        os.remove(fname)
+        self.assertIn('PNG image', result.decode('UTF-8'))
+
+
+class EngineTest(unittest.TestCase):
+    '''Tests basic Engine constructs'''
+
+    def test_empty_engine(self):
+        with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
+            class TestEngine(Engine):
+                pass
+
+    def test_engine_scope_non_list(self):
+        with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
+            class TestEngine(Engine):
+                scopes = "moo"
+
+    def test_engine_scope_non_scopes(self):
+        with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
+            class TestEngine(Engine):
+                scopes = ["moo"]
+
+    def test_scope_edge_event_engine_equal(self):
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                go = ['first__second']
+        Scope1.validate()
+        val1 = clean_dot(Scope1.graph())
+        class TestEngine(Engine):
+            scopes = [Scope1]
+        TestEngine.validate()
+        val2 = clean_dot(TestEngine.graph())
+        self.assertEqual(val1, val2)
+
+    def test_two_scopes(self):
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                go = ['first__second']
+        class Scope2(Scope):
+            initial = 'first'
+            class Events:
+                go = ['first__second']
+        class TestEngine(Engine):
+            scopes = [Scope1, Scope2]
+        TestEngine.validate()
+        self.assertEqual(clean_dot(TestEngine.graph()), set([
+            'scope1:first',
+            'scope1:second',
+            'scope1:first -> scope1:second',
+            'scope2:first',
+            'scope2:second',
+            'scope2:first -> scope2:second',
+        ]))
+
+    def test_engine_generate_png(self):
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                go = ['first__second']
+                goo = ['*__third']
+        Scope1.validate()
+        class TestEngine(Engine):
+            scopes = [Scope1]
+        TestEngine.validate()
+        fname = '/tmp/%s.png' % uuid.uuid4()
+        TestEngine.graph().render(fname)
         result = subprocess.Popen(['file', fname], stdout=subprocess.PIPE).communicate()[0]
         os.remove(fname)
         self.assertIn('PNG image', result.decode('UTF-8'))
