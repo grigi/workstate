@@ -116,7 +116,7 @@ BookEngine.graph().render('bookengine.png')
 
 def clean_dot(dot):
     '''Cleans out formatting from dot input'''
-    return set([val.split('[')[0].replace('"', '').strip() for val in dot.body])
+    return set([val.split('[')[0].replace('"', '').strip() for val in dot.body if '\t' in val])
 
 class WorkState(unittest.TestCase):
     '''Tests basic WorkState constructs'''
@@ -150,38 +150,65 @@ class WorkState(unittest.TestCase):
             'scope1:first',
         ]))
 
-    """def test_scope_edge_event(self):
-        engine = Engine()
-        scope1 = engine.scope('scope1', initial='first')
-        scope1.add_transition('first', 'second')
+    def test_scope_edge_noevent(self):
+        class Scope1(Scope):
+            initial = 'first'
+            class Transitions:
+                first__second = 'Some sample transition'
         with self.assertRaisesRegexp(Exception, 'Transition.*has no events'):
-            engine.validate()
-        engine.add_event('go', ['scope1:first->second'])
-        engine.validate()
-        self.assertEqual(clean_dot(engine.graph()), set([
+            Scope1.validate()
+        self.assertEqual(clean_dot(Scope1.graph()), set([
             'scope1:first',
             'scope1:second',
             'scope1:first -> scope1:second',
         ]))
 
+    def test_scope_edge_event(self):
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                go = ['first__second']
+        Scope1.validate()
+        self.assertEqual(clean_dot(Scope1.graph()), set([
+            'scope1:first',
+            'scope1:second',
+            'scope1:first -> scope1:second',
+        ]))
+
+    def test_scope_edge_event_engine_equal(self):
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                go = ['first__second']
+        Scope1.validate()
+        val1 = clean_dot(Scope1.graph())
+        class TestEngine(Engine):
+            scopes = [Scope1]
+        TestEngine.validate()
+        val2 = clean_dot(TestEngine.graph())
+        self.assertEqual(val1, val2)
+
     def test_scope_loose_states(self):
-        engine = Engine()
-        scope1 = engine.scope('scope1', initial='first')
-        scope1.add_transition('first', 'second')
-        scope1.add_transition('third', 'fourth')
-        engine.add_event('go', ['scope1:first->second', 'scope1:third->fourth'])
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                go = ['first__second', 'third__fourth']
         with self.assertRaisesRegexp(Exception, 'States.*not reachable'):
-            engine.validate()
+            Scope1.validate()
 
     def test_two_scopes(self):
-        engine = Engine()
-        scope1 = engine.scope('scope1', initial='first')
-        scope1.add_transition('first', 'second')
-        scope2 = engine.scope('scope2', initial='first')
-        scope2.add_transition('first', 'second')
-        engine.add_event('go', ['scope1:first->second', 'scope2:first->second'])
-        engine.validate()
-        self.assertEqual(clean_dot(engine.graph()), set([
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                go = ['first__second']
+        class Scope2(Scope):
+            initial = 'first'
+            class Events:
+                go = ['first__second']
+        class TestEngine(Engine):
+            scopes = [Scope1, Scope2]
+        TestEngine.validate()
+        self.assertEqual(clean_dot(TestEngine.graph()), set([
             'scope1:first',
             'scope1:second',
             'scope1:first -> scope1:second',
@@ -191,14 +218,13 @@ class WorkState(unittest.TestCase):
         ]))
 
     def test_wildcard_edge(self):
-        engine = Engine()
-        scope1 = engine.scope('scope1', initial='first')
-        scope1.add_transition('first', 'second')
-        scope1.add_transition('*', 'third')
-        engine.add_event('go', ['scope1:first->second'])
-        engine.add_event('goo', ['scope1:*->third'])
-        engine.validate()
-        self.assertEqual(clean_dot(engine.graph()), set([
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                go = ['first__second']
+                goo = ['*__third']
+        Scope1.validate()
+        self.assertEqual(clean_dot(Scope1.graph()), set([
             'scope1:first',
             'scope1:second',
             'scope1:third',
@@ -208,7 +234,7 @@ class WorkState(unittest.TestCase):
 
         ]))
 
-    def test_event_already_defined(self):
+    """def test_event_already_defined(self):
         engine = Engine()
         scope1 = engine.scope('scope1', initial='first')
         scope1.add_transition('first', 'second')

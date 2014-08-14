@@ -321,15 +321,18 @@ class Scope(object):
 
         for name, edge in transitions.items():
             if edge.from_state != '*':
-                for event in events[name]:
-                    trigger = triggers.get(event, None)
-                    pevent = event.replace('_', ' ').title()
-                    style = "dashed" if edge.condition else "solid"
-                    if trigger:
-                        tname = trigger[0].split(':')[1]
-                        dot.edge(canon(edge.from_state), canon(edge.to_state), pevent+' <SUP><FONT POINT-SIZE="10">('+tname+')</FONT></SUP>', style=style, color=FGCOLORS[col])
-                    else:
-                        dot.edge(canon(edge.from_state), canon(edge.to_state), pevent, style=style, color=FGCOLORS[col])
+                if name in events:
+                    for event in events[name]:
+                        trigger = triggers.get(event, None)
+                        pevent = event.replace('_', ' ').title()
+                        style = "dashed" if edge.condition else "solid"
+                        if trigger:
+                            tname = trigger[0].split(':')[1]
+                            dot.edge(canon(edge.from_state), canon(edge.to_state), pevent+' <SUP><FONT POINT-SIZE="10">('+tname+')</FONT></SUP>', style=style, color=FGCOLORS[col])
+                        else:
+                            dot.edge(canon(edge.from_state), canon(edge.to_state), pevent, style=style, color=FGCOLORS[col])
+                else:
+                    dot.edge(canon(edge.from_state), canon(edge.to_state), style="dotted", color=FGCOLORS[col])
             else:
                 wildcards.add(edge.to_state)
 
