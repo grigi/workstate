@@ -234,46 +234,38 @@ class WorkState(unittest.TestCase):
 
         ]))
 
-    """def test_event_already_defined(self):
-        engine = Engine()
-        scope1 = engine.scope('scope1', initial='first')
-        scope1.add_transition('first', 'second')
-        engine.add_event('go', ['scope1:first->second'])
-        # don't fail here
-        engine.add_event('moo', ['scope1:first->second'])
-        # fail here
-        with self.assertRaisesRegexp(Exception, 'Event go already defined'):
-            engine.add_event('go', ['scope1:first->second'])
-
-    def test_event_bad_transition(self):
-        engine = Engine()
-        scope1 = engine.scope('scope1', initial='first')
-        scope1.add_transition('first', 'second')
-        with self.assertRaisesRegexp(Exception, "Transition.*doesn't exist"):
-            engine.add_event('go', ['scope1:first->second', 'scope1:bad->second'])
-
     def test_define_states(self):
-        engine = Engine()
-        states = {
-            'first': 'The first',
-            'second': 'The second',
-            'do_it': 'Yup, you gotta DO it',
-        }
-        scope1 = engine.scope('scope1', initial='first', states=states)
-        self.assertEqual(set(states.keys()), set(scope1.states.keys()))
-        for key, val in scope1.states.items():
-            # check that docs got transferred
-            self.assertEqual(val.doc, states[key])
+        class Scope1(Scope):
+            initial = 'first'
+            class States:
+                first = 'The first'
+                second = 'The second'
+                do_it = 'Yup, you gotta DO it'
+        states = Scope1.get_parsed()['states'].states
+        # Check that states are there
+        self.assertEqual(set(states.keys()), set([
+            'scope1:first',
+            'scope1:second',
+            'scope1:do_it',
+        ]))
+        # Check that docs got transferred
+        self.assertEqual(set([a.doc for a in states.values()]), set([
+            'The first',
+            'The second',
+            'Yup, you gotta DO it',
+        ]))
+        # Of course validation should fail as this is an incomplete scope
+        with self.assertRaisesRegexp(Exception, 'States.*not reachable'):
+            Scope1.validate()
 
     def test_listed_transition(self):
-        engine = Engine()
-        scope1 = engine.scope('scope1', initial='first')
-        scope1.add_transition('first', 'third')
-        scope1.add_transition(['first', 'third'], 'second')
-        engine.add_event('bad', ['scope1:first->third'])
-        engine.add_event('go', ['scope1:first->second', 'scope1:third->second'])
-        engine.validate()
-        self.assertEqual(clean_dot(engine.graph()), set([
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                bad = ['first__third']
+                go = ['first__second', 'third__second']
+        Scope1.validate()
+        self.assertEqual(clean_dot(Scope1.graph()), set([
             'scope1:first',
             'scope1:second',
             'scope1:third',
@@ -283,16 +275,14 @@ class WorkState(unittest.TestCase):
         ]))
 
     def test_validator_handles_loops(self):
-        engine = Engine()
-        scope1 = engine.scope('scope1', initial='first')
-        scope1.add_transition('first', 'first')
-        scope1.add_transition('second', 'third')
-        scope1.add_transition(['first', 'third'], 'second')
-        engine.add_event('delay', ['scope1:first->first'])
-        engine.add_event('retry', ['scope1:second->third'])
-        engine.add_event('go', ['scope1:first->second', 'scope1:third->second'])
-        engine.validate()
-        self.assertEqual(clean_dot(engine.graph()), set([
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                delay = ['first__first']
+                retry = ['second__third']
+                go = ['first__second', 'third__second']
+        Scope1.validate()
+        self.assertEqual(clean_dot(Scope1.graph()), set([
             'scope1:first',
             'scope1:second',
             'scope1:third',
@@ -302,35 +292,19 @@ class WorkState(unittest.TestCase):
             'scope1:second -> scope1:third',
         ]))
 
-    def test_duplicate_transition(self):
-        engine = Engine()
-        scope1 = engine.scope('scope1', initial='first')
-        scope1.add_transition('first', 'second')
-        with self.assertRaisesRegexp(Exception, "Transition.*already defined"):
-            scope1.add_transition('first', 'second')
-
-    def test_duplicate_transition_wildcard(self):
-        engine = Engine()
-        scope1 = engine.scope('scope1', initial='first')
-        scope1.add_transition('first', 'second')
-        with self.assertRaisesRegexp(Exception, "Transition.*already defined"):
-            scope1.add_transition('*', 'second')
-
     def test_generate_png(self):
-        engine = Engine()
-        scope1 = engine.scope('scope1', initial='first')
-        scope1.add_transition('first', 'second')
-        scope1.add_transition('*', 'third')
-        engine.add_event('go', ['scope1:first->second'])
-        engine.add_event('goo', ['scope1:*->third'])
-        engine.validate()
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                go = ['first__second']
+                goo = ['*__third']
+        Scope1.validate()
         fname = '/tmp/%s.png' % uuid.uuid4()
-        engine.graph().render(fname)
+        Scope1.graph().render(fname)
         result = subprocess.Popen(['file', fname], stdout=subprocess.PIPE).communicate()[0]
         os.remove(fname)
         self.assertIn('PNG image', result.decode('UTF-8'))
 
-"""
 
 if __name__ == '__main__':
     unittest.main()

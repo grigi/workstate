@@ -82,7 +82,11 @@ class Events(object):
         _transitions = []
         for tran in transitions:
             _transitions.append(self.transs.ensure_transition(tran))
-        event = self.events[name] = Event(name, _transitions, [], doc)
+        if name in self.events:
+            event = self.events[name]
+            event.transitions.extend(_transitions)
+        else:
+            event = self.events[name] = Event(name, _transitions, [], doc)
 
         return event
 
@@ -118,8 +122,6 @@ class ScopeMeta(type):
     def __new__(mcs, name, parents, dct):
 
         if '__the_base_class__' not in dct:
-            #print(name, list(dct.keys()))
-
             # create a class_id if it's not specified
             if 'scope' not in dct:
                 dct['scope'] = name.lower()
