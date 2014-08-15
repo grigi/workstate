@@ -314,7 +314,37 @@ class ScopeTest(unittest.TestCase):
             'scope2:second -> scope2:third',
         ]))
 
-    # TODO: Triggers
+    def test_missing_event_trigger(self):
+        '''Scope: Missing event on trigger'''
+        with self.assertRaisesRegexp(Exception, "Event.*doesn't exist"):
+            class Scope1(Scope):
+                initial = 'first'
+                class Events:
+                    bad = ['first__second']
+                class Triggers:
+                    @trigger('goo', ['second'])
+                    def check_complete(self):
+                        return True
+
+    def test_basic_trigger(self):
+        '''Scope: Basic trigger-next event'''
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                bad = ['first__second']
+                goo = ['second__third']
+            class Triggers:
+                @trigger('goo', ['second'])
+                def check_complete(self):
+                    return True
+        Scope1.validate()
+        self.assertEqual(clean_dot(Scope1.graph()), set([
+            'scope1:first',
+            'scope1:second',
+            'scope1:third',
+            'scope1:first -> scope1:second',
+            'scope1:second -> scope1:third',
+        ]))
 
 
 

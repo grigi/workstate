@@ -115,7 +115,10 @@ class Triggers(object):
         name = self.states.fullname(name)
         _trigger = Trigger(event, states, condition, doc)
         self.triggers[name] = _trigger
-        _event = self.events.events[event]
+        try:
+            _event = self.events.events[event]
+        except KeyError:
+            raise Exception("Event %s doesn't exist" % event)
         _event.triggers.append(name)
 
         for state in states:
