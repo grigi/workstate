@@ -4,7 +4,7 @@ import subprocess
 import uuid
 from pprint import pprint
 
-from workstate.engine import Engine, Scope, trigger
+from workstate.engine import *
 
 try:
     import unittest2 as unittest #pylint: disable=F0401
@@ -144,7 +144,7 @@ class ScopeTest(unittest.TestCase):
             initial = 'first'
             class Transitions:
                 first__second = 'Some sample transition'
-        with self.assertRaisesRegexp(Exception, 'Transition.*has no events'):
+        with self.assertRaisesRegexp(BrokenStateModelException, 'Transition.*has no events'):
             Scope1.validate()
         self.assertEqual(clean_dot(Scope1.graph()), set([
             'scope1:first',
@@ -171,7 +171,7 @@ class ScopeTest(unittest.TestCase):
             initial = 'first'
             class Events:
                 goo = ['first__second', 'third__fourth']
-        with self.assertRaisesRegexp(Exception, 'States.*not reachable'):
+        with self.assertRaisesRegexp(BrokenStateModelException, 'States.*not reachable'):
             Scope1.validate()
 
     def test_wildcard_edge(self):
@@ -213,7 +213,7 @@ class ScopeTest(unittest.TestCase):
             'Yup, you gotta DO it',
         ]))
         # Of course validation should fail as this is an incomplete scope
-        with self.assertRaisesRegexp(Exception, 'States.*not reachable'):
+        with self.assertRaisesRegexp(BrokenStateModelException, 'States.*not reachable'):
             Scope1.validate()
 
     def test_listed_transition(self):
@@ -274,7 +274,7 @@ class ScopeTest(unittest.TestCase):
                 def first__second(self):
                     '''A Conditional transition'''
                     return False
-        with self.assertRaisesRegexp(Exception, 'Transition.*has no events'):
+        with self.assertRaisesRegexp(BrokenStateModelException, 'Transition.*has no events'):
             Scope1.validate()
         self.assertEqual(clean_dot(Scope1.graph()), set([
             'scope1:first',
@@ -299,7 +299,7 @@ class ScopeTest(unittest.TestCase):
         ]))
 
     def test_scoped_transition_names(self):
-        '''Scope: scoped and unscoped state names'''
+        '''Scope: scoped and unscoped transition names'''
         class Scope1(Scope):
             class Events:
                 bad = ['first__second']
@@ -316,15 +316,16 @@ class ScopeTest(unittest.TestCase):
 
     def test_missing_event_trigger(self):
         '''Scope: Missing event on trigger'''
-        with self.assertRaisesRegexp(Exception, "Event.*doesn't exist"):
-            class Scope1(Scope):
-                initial = 'first'
-                class Events:
-                    bad = ['first__second']
-                class Triggers:
-                    @trigger('goo', ['second'])
-                    def check_complete(self):
-                        return True
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                bad = ['first__second']
+            class Triggers:
+                @trigger('goo', ['second'])
+                def check_complete(self):
+                    return True
+        with self.assertRaisesRegexp(BrokenStateModelException, "Event.*contains no transitions"):
+            Scope1.validate()
 
     def test_basic_trigger(self):
         '''Scope: Basic trigger-next event'''
@@ -347,25 +348,24 @@ class ScopeTest(unittest.TestCase):
         ]))
 
 
-
 class EngineTest(unittest.TestCase):
     '''Tests basic Engine constructs'''
 
     def test_empty_engine(self):
         '''Engine: Empty'''
-        with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
+        with self.assertRaisesRegexp(BrokenStateModelException, "Engine needs scopes"):
             class TestEngine(Engine):
                 pass
 
     def test_engine_scope_non_list(self):
         '''Engine: scopes not in a List'''
-        with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
+        with self.assertRaisesRegexp(BrokenStateModelException, "Engine needs scopes"):
             class TestEngine(Engine):
                 scopes = "moo"
 
     def test_engine_scope_non_scopes(self):
         '''Engine: List doesn't contain Scopes'''
-        with self.assertRaisesRegexp(Exception, "Engine needs scopes"):
+        with self.assertRaisesRegexp(BrokenStateModelException, "Engine needs scopes"):
             class TestEngine(Engine):
                 scopes = ["moo"]
 
@@ -379,7 +379,6 @@ class EngineTest(unittest.TestCase):
         val1 = clean_dot(Scope1.graph())
         class TestEngine(Engine):
             scopes = [Scope1]
-        TestEngine.validate()
         val2 = clean_dot(TestEngine.graph())
         self.assertEqual(val1, val2)
 
@@ -395,7 +394,6 @@ class EngineTest(unittest.TestCase):
                 goo = ['first__second']
         class TestEngine(Engine):
             scopes = [Scope1, Scope2]
-        TestEngine.validate()
         self.assertEqual(clean_dot(TestEngine.graph()), set([
             'scope1:first',
             'scope1:second',
@@ -415,16 +413,99 @@ class EngineTest(unittest.TestCase):
         Scope1.validate()
         class TestEngine(Engine):
             scopes = [Scope1]
-        TestEngine.validate()
         fname = '/tmp/%s.png' % uuid.uuid4()
         TestEngine.graph().render(fname)
         result = subprocess.Popen(['file', fname], stdout=subprocess.PIPE).communicate()[0]
         os.remove(fname)
         self.assertIn('PNG image', result.decode('UTF-8'))
 
-    # TODO: cross-scope Triggers
+    def test_engine_auto_validation(self):
+        '''Engine: Validations always run on Engine creation'''
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                goo = ['first__second']
+                gaa = ['fourth__third']
+        with self.assertRaisesRegexp(BrokenStateModelException, 'States.*not reachable'):
+            class TestEngine(Engine):
+                scopes = [Scope1]
 
-    # TODO: cross-scope names
+    @unittest.expectedFailure
+    def test_cross_scope_state_names(self):
+        '''Engine: Cross-scope state names'''
+        class Scope1(Scope):
+            initial = 'first'
+        class Scope2(Scope):
+            initial = 'first'
+            class Events:
+                goo = ['first__second', 'scope1:first__second']
+        class TestEngine(Engine):
+            scopes = [Scope1, Scope2]
+        self.assertEqual(clean_dot(TestEngine.graph()), set([
+            'scope1:first',
+            'scope1:second',
+            'scope1:first -> scope1:second',
+            'scope2:first',
+            'scope2:second',
+            'scope2:first -> scope2:second',
+        ]))
+
+    def test_cross_scope_trigger_edges(self):
+        '''Engine: Cross-scope trigger edges'''
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                foo = ['first__second']
+        class Scope2(Scope):
+            initial = 'first'
+            class Events:
+                bar = ['first__second', 'second__third']
+            class Triggers:
+                @trigger('bar', ['scope1:second'])
+                def justdoit(self):
+                    return True
+        class TestEngine(Engine):
+            scopes = [Scope1, Scope2]
+        self.assertEqual(clean_dot(TestEngine.graph()), set([
+            'scope1:first',
+            'scope1:second',
+            'scope1:first -> scope1:second',
+            'scope2:first',
+            'scope2:second',
+            'scope2:third',
+            'scope2:first -> scope2:second',
+            'scope2:second -> scope2:third',
+            'scope1:second -> scope2:second',
+            'scope1:second -> scope2:third',
+        ]))
+
+    @unittest.expectedFailure
+    def test_cross_scope_trigger_events(self):
+        '''Engine: Cross-scope trigger events'''
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                foo = ['first__second']
+                foo = ['first__second']
+            class Triggers:
+                @trigger('bar', ['second'])
+                def justdoit(self):
+                    return True
+        class Scope2(Scope):
+            initial = 'first'
+            class Events:
+                bar = ['first__second']
+        class TestEngine(Engine):
+            scopes = [Scope1, Scope2]
+        self.assertEqual(clean_dot(TestEngine.graph()), set([
+            'scope1:first',
+            'scope1:second',
+            'scope1:first -> scope1:second',
+            'scope2:first',
+            'scope2:second',
+            'scope2:first -> scope2:second',
+            'scope1:second -> scope2:second',
+        ]))
 
 
 if __name__ == '__main__':

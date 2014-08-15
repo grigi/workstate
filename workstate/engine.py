@@ -7,8 +7,10 @@ from six import add_metaclass
 
 from workstate.docgen import Digraph, BGCOLORS, FGCOLORS
 
-__all__ = ['Engine', 'Scope', 'trigger']
+__all__ = ['Engine', 'Scope', 'BrokenStateModelException', 'trigger']
 
+class BrokenStateModelException(Exception):
+    pass
 
 State = namedtuple('State', 'scope state source_edges dest_edges triggers doc')
 Transition = namedtuple('Transition', 'scope from_state to_state condition doc')
@@ -115,10 +117,8 @@ class Triggers(object):
         name = self.states.fullname(name)
         _trigger = Trigger(event, states, condition, doc)
         self.triggers[name] = _trigger
-        try:
-            _event = self.events.events[event]
-        except KeyError:
-            raise Exception("Event %s doesn't exist" % event)
+        self.events.update_event(event, [])
+        _event = self.events.events[event]
         _event.triggers.append(name)
 
         for state in states:
@@ -188,7 +188,7 @@ class ScopeMeta(type):
                             edges = [a for a in val if isinstance(a, list)][0]
                             doc = [a for a in val if isinstance(a, str)][0]
                         except IndexError:
-                            raise Exception('Events need to be one of: [], ("",[]), ([],"")')
+                            raise BrokenStateModelException('Events need to be one of: [], ("",[]), ([],"")')
                         events.update_event(key, edges, doc)
 
             if 'Triggers' in dct:
@@ -244,13 +244,19 @@ class Scope(object):
         scope = cls.get_scope()
         _states = cls.get_parsed()['states'].states
         _transitions = cls.get_parsed()['transs']
+        _events = cls.get_parsed()['events'].events
         events = cls.get_event_map()
 
         # Check that each edge has an event that can trigger it
         for key, transition in _transitions.transitions.items():
             edge = transition.scope+':'+transition.from_state+'__'+transition.to_state
             if not events.get(edge, None):
-                raise Exception("Transition %s has no events that can trigger it" % key)
+                raise BrokenStateModelException("Transition %s has no events that can trigger it" % key)
+
+        # Check that all events contains edges
+        for key, val in _events.items():
+            if not val.transitions:
+                raise BrokenStateModelException("Event %s contains no transitions" % key)
 
         # Check that all states are connected
         initial = cls.get_initial()
@@ -281,7 +287,7 @@ class Scope(object):
                             order.append(_state)
 
             if pool:
-                raise Exception("States %s not reachable from initial state" % list(pool))
+                raise BrokenStateModelException("States %s not reachable from initial state" % list(pool))
 
     @classmethod
     def order_states(cls):
@@ -418,15 +424,19 @@ class EngineMeta(type):
     def __new__(mcs, name, parents, dct):
         if '__the_base_class__' not in dct:
             if 'scopes' not in dct or not isinstance(dct['scopes'], list):
-                raise Exception("Engine needs scopes defined as a scope list")
+                raise BrokenStateModelException("Engine needs scopes defined as a scope list")
             for scope in dct['scopes']:
                 if '__parsed' not in dir(scope):
-                    raise Exception("Engine needs scopes defined as a scope list")
+                    raise BrokenStateModelException("Engine needs scopes defined as a scope list")
 
         # TODO: Merge __parsed translations lookups
 
-        # we need to call type.__new__ zto complete the initialization
-        return type.__new__(mcs, name, parents, dct)
+        # we need to call type.__new__ to complete the initialization
+        cls =  type.__new__(mcs, name, parents, dct)
+        if '__the_base_class__' not in dct:
+            # Validate the Engine to ensure it is sane
+            cls.validate()
+        return cls
 
 
 @add_metaclass(EngineMeta)
@@ -442,6 +452,7 @@ class Engine(object):
     @classmethod
     def graph(cls):
         '''Generates dot graph for whole engine'''
+        # TODO: build graph from merged __parsed
         dot = Digraph()
 
         for idx, scope in enumerate(cls.get_scopes()):
@@ -458,6 +469,7 @@ class Engine(object):
     @classmethod
     def validate(cls):
         '''Validates the WorkState Engine'''
+        # TODO: validate against own merged __parsed
         # Validate nodes, edges and states
         for scope in cls.get_scopes():
             scope.validate()
@@ -473,3 +485,4 @@ def trigger(event, states):
         fun.states = states
         return fun
     return _wrap
+
