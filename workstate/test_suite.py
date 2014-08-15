@@ -486,7 +486,6 @@ class EngineTest(unittest.TestCase):
             initial = 'first'
             class Events:
                 foo = ['first__second']
-                foo = ['first__second']
             class Triggers:
                 @trigger('bar', ['second'])
                 def justdoit(self):

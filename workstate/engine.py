@@ -15,7 +15,7 @@ class BrokenStateModelException(Exception):
 State = namedtuple('State', 'scope state source_edges dest_edges triggers doc')
 Transition = namedtuple('Transition', 'scope from_state to_state condition doc')
 Event = namedtuple('Event', 'event transitions triggers doc')
-Trigger = namedtuple('Trigger', 'event states condition doc')
+Trigger = namedtuple('Trigger', 'name event states condition doc')
 
 class States(object):
     '''State container'''
@@ -23,9 +23,16 @@ class States(object):
         self.scope = scope
         self.states = {}
 
-    def fullname(self, name):
+    def fullname(self, name, scope=None):
         '''Returns canonical name'''
-        return name if ':' in name else self.scope+':'+name
+        if ':' in name:
+            return name
+        else:
+            _scope = self.scope
+            if _scope:
+                return self.scope+':'+name
+            else:
+                return scope+':'+name
 
     def ensure_state(self, name, doc=None):
         '''Ensures that a state exists'''
@@ -37,9 +44,12 @@ class States(object):
 
         return self.states[fqsn]
 
-    def get_state(self, name):
+    def merge_state(self, obj):
+        self.ensure_state(obj.scope+':'+obj.state, obj.doc)
+
+    def get_state(self, name, scope=None):
         '''Return state object'''
-        return self.states[self.fullname(name)]
+        return self.states[self.fullname(name, scope)]
 
     def __repr__(self):
         return repr(self.states)
@@ -78,6 +88,9 @@ class Transitions(object):
 
         return fqsn
 
+    def merge_transition(self, obj):
+        self.ensure_transition(obj.scope+':'+obj.from_state+'__'+obj.to_state, obj.condition, obj.doc)
+
     def __repr__(self):
         return repr(self.transitions)
 
@@ -101,6 +114,9 @@ class Events(object):
 
         return event
 
+    def merge_event(self, obj):
+        self.update_event(obj.event, obj.transitions, obj.doc)
+
     def __repr__(self):
         return repr(self.events)
 
@@ -115,7 +131,8 @@ class Triggers(object):
     def add_trigger(self, name, event, states, condition, doc=None):
         '''Add a trigger condition'''
         name = self.states.fullname(name)
-        _trigger = Trigger(event, states, condition, doc)
+        scope = name.split(':')[0]
+        _trigger = Trigger(name, event, states, condition, doc)
         self.triggers[name] = _trigger
         self.events.update_event(event, [])
         _event = self.events.events[event]
@@ -123,10 +140,13 @@ class Triggers(object):
 
         for state in states:
             try:
-                _state = self.states.get_state(state)
+                _state = self.states.get_state(state, scope)
                 _state.triggers.append(name)
             except KeyError:
                 pass
+
+    def merge_trigger(self, obj):
+        self.add_trigger(obj.name, obj.event, obj.states, obj.condition, obj.doc)
 
     def __repr__(self):
         return repr(self.triggers)
@@ -429,7 +449,43 @@ class EngineMeta(type):
                 if '__parsed' not in dir(scope):
                     raise BrokenStateModelException("Engine needs scopes defined as a scope list")
 
-        # TODO: Merge __parsed translations lookups
+            _scopes = dct['scopes']
+            scopes = {}
+            states = States(None)
+            transs = Transitions(None, states)
+            events = Events(transs)
+            triggers = Triggers(events, states)
+
+            dct['__parsed'] = {
+                'scopes': scopes,
+                'states': states,
+                'transs': transs,
+                'events': events,
+                'trigrs': triggers
+            }
+
+            for scope in _scopes:
+                spar = scope.get_parsed()
+
+                for state in spar['states'].states.values():
+                    states.merge_state(state)
+
+                for trans in spar['transs'].transitions.values():
+                    transs.merge_transition(trans)
+
+                for event in spar['events'].events.values():
+                    events.merge_event(event)
+
+                for trigger in spar['trigrs'].triggers.values():
+                    triggers.merge_trigger(trigger)
+
+            scopenames = set([a.scope for a in states.states.values()])
+            for name in scopenames:
+                try:
+                    scopes[name] = [a.get_initial() for a in _scopes if a.get_scope() == name][0]
+                except IndexError:
+                    scopes[name] = None
+
 
         # we need to call type.__new__ to complete the initialization
         cls =  type.__new__(mcs, name, parents, dct)
@@ -445,9 +501,29 @@ class Engine(object):
     __the_base_class__ = True
 
     @classmethod
+    def get_parsed(cls):
+        '''returns the parsed translation lookup'''
+        return getattr(cls, '__parsed')
+
+    @classmethod
     def get_scopes(cls):
         '''Returns the current scope'''
         return getattr(cls, 'scopes')
+
+    @classmethod
+    def get_event_map(cls):
+        '''Maps edges to transitions'''
+        _events = cls.get_parsed()['events'].events
+        _transitions = cls.get_parsed()['transs']
+
+        events = {}
+        for event in _events.values():
+            for _trans in event.transitions:
+                trans = _transitions.fullname(_trans)
+                events.setdefault(trans, [])
+                events[trans].append(event.event)
+
+        return events
 
     @classmethod
     def graph(cls):
@@ -469,12 +545,60 @@ class Engine(object):
     @classmethod
     def validate(cls):
         '''Validates the WorkState Engine'''
-        # TODO: validate against own merged __parsed
+        '''# TODO: validate against own merged __parsed
         # Validate nodes, edges and states
         for scope in cls.get_scopes():
             scope.validate()
 
-        # TODO: Validate triggers
+        # TODO: Validate triggers'''
+
+        _scopes = cls.get_parsed()['scopes']
+        _states = cls.get_parsed()['states'].states
+        _transitions = cls.get_parsed()['transs']
+        _events = cls.get_parsed()['events'].events
+        events = cls.get_event_map()
+
+        # Check that each edge has an event that can trigger it
+        for key, transition in _transitions.transitions.items():
+            edge = transition.scope+':'+transition.from_state+'__'+transition.to_state
+            if not events.get(edge, None):
+                raise BrokenStateModelException("Transition %s has no events that can trigger it" % key)
+
+        # Check that all events contains edges
+        for key, val in _events.items():
+            if not val.transitions:
+                raise BrokenStateModelException("Event %s contains no transitions" % key)
+
+        # Check that all states are connected
+        for scope, initial in _scopes.items():
+            if initial:
+                pool = set([a for a,b in _states.items() if b.scope == scope])
+                order = []
+
+                def mark_states(statename):
+                    '''Recursivley mark states that are accesible'''
+                    if statename in pool:
+                        pool.remove(statename)
+                        order.append(statename)
+                    state = _states[statename]
+                    dest_edges = [_transitions.transitions[edge] for edge in state.dest_edges]
+                    dest_states = [a.scope+':'+a.to_state for a in dest_edges]
+                    for substate in set(dest_states).intersection(pool):
+                        mark_states(substate)
+                mark_states(scope+':'+initial)
+
+                # Wildcard states
+                for event in events.keys():
+                    (from_state, to_state) = event.split('__')
+                    if '*' in from_state:
+                        for _state in list(pool):
+                            (scope, state) = _state.split(':')
+                            if state == to_state:
+                                pool.remove(_state)
+                                order.append(_state)
+
+                if pool:
+                    raise BrokenStateModelException("States %s not reachable from initial state in scope %s" % (list(pool), scope))
 
 
 def trigger(event, states):
