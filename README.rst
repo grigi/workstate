@@ -7,6 +7,16 @@ WorkState is a self-documenting Workflow-event state management system.
 .. image:: https://travis-ci.org/grigi/workstate.png
    :target: https://travis-ci.org/grigi/workstate
 
+**Note**:
+
+    This is still in the toy phase, lots of basic requirements are not yet implemented (and some not even thought of yet)
+    The plan is for a clean way to specify how a state-machine should behave, and how it interacts with other state machines.
+    Scopes should be re-usable, and the Engine should ensure that the state-machine is valid at compile time.
+    The Scopes should be loosely connected to whatever is their data-store, hence work with whatever backend you deem,
+    they should even be usable as a state-computer for some external system model.
+
+    Unfortunately it is not near there yet. At least the specification is near done :-)
+
 -----
 Usage
 -----
@@ -59,7 +69,7 @@ A minimal example:
         scopes = [Book, Chapter]
 
 
-Using the engine:
+Using the engine: (needs to change, invalid samples follow)
 
 .. code:: python
 
