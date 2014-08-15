@@ -329,11 +329,14 @@ class Scope(object):
         events = cls.get_event_map()
         triggers = dict([(a.event, (b, a.states)) for b, a in cls.get_parsed()['trigrs'].triggers.items()])
 
-        def canon(val):
+        def canon(val, scope=None):
             '''Returns canonical edge name'''
             if ':' in val:
                 return val
-            return cls.get_scope()+':'+val
+            if scope:
+                return scope+':'+val
+            else:
+                return cls.get_scope()+':'+val
 
         for fullstate in cls.order_states():
             state = fullstate.split(':')[1]
@@ -353,20 +356,21 @@ class Scope(object):
                         if _trigger:
                             tname = _trigger[0].split(':')[1]
                             pretty = pevent+' <SUP><FONT POINT-SIZE="10">('+tname+')</FONT></SUP>'
-                            dot.edge(canon(edge.from_state), canon(edge.to_state), pretty, style=style, color=FGCOLORS[col])
+                            dot.edge(canon(edge.from_state, edge.scope), canon(edge.to_state, edge.scope), pretty, style=style, color=FGCOLORS[col])
                         else:
-                            dot.edge(canon(edge.from_state), canon(edge.to_state), pevent, style=style, color=FGCOLORS[col])
+                            dot.edge(canon(edge.from_state, edge.scope), canon(edge.to_state, edge.scope), pevent, style=style, color=FGCOLORS[col])
                 else:
-                    dot.edge(canon(edge.from_state), canon(edge.to_state), style="dotted", color=FGCOLORS[col])
+                    dot.edge(canon(edge.from_state, edge.scope), canon(edge.to_state, edge.scope), style="dotted", color=FGCOLORS[col])
             else:
-                wildcards.add(edge.to_state)
+                wildcards.add((edge.to_state, edge.scope))
 
         if wildcards:
-            dot.node(canon('*'), 'Any', shape='none', style="filled", fillcolor=BGCOLORS[col], color=FGCOLORS[col])
-            for dest in wildcards:
+            for scope in set([_wc[1] for _wc in wildcards]):
+                dot.node(canon('*', scope), 'Any', shape='none', style="filled", fillcolor=BGCOLORS[col], color=FGCOLORS[col])
+            for dest, scope in wildcards:
                 for event in events['%s:*__%s' % (cls.get_scope(), dest)]:
                     pevent = event.replace('_', ' ').title()
-                    dot.edge(canon('*'), canon(dest), pevent, color=FGCOLORS[col])
+                    dot.edge(canon('*', scope), canon(dest, scope), pevent, color=FGCOLORS[col])
 
         return dot
 

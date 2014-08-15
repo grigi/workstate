@@ -189,7 +189,6 @@ class ScopeTest(unittest.TestCase):
             'scope1:*',
             'scope1:first -> scope1:second',
             'scope1:* -> scope1:third',
-
         ]))
 
     def test_define_states(self):
@@ -267,11 +266,56 @@ class ScopeTest(unittest.TestCase):
         os.remove(fname)
         self.assertIn('PNG image', result.decode('UTF-8'))
 
-    # TODO: conditional transitions
+    def test_conditional_transition(self):
+        '''Scope: Conditional transitions'''
+        class Scope1(Scope):
+            initial = 'first'
+            class Transitions:
+                def first__second(self):
+                    '''A Conditional transition'''
+                    return False
+        with self.assertRaisesRegexp(Exception, 'Transition.*has no events'):
+            Scope1.validate()
+        self.assertEqual(clean_dot(Scope1.graph()), set([
+            'scope1:first',
+            'scope1:second',
+            'scope1:first -> scope1:second',
+        ]))
+
+    def test_scoped_state_names(self):
+        '''Scope: scoped and unscoped state names'''
+        class Scope1(Scope):
+            initial = 'first'
+            class Events:
+                bad = ['first__second']
+                goo = ['scope1:second__third']
+        Scope1.validate()
+        self.assertEqual(clean_dot(Scope1.graph()), set([
+            'scope1:first',
+            'scope1:second',
+            'scope1:third',
+            'scope1:first -> scope1:second',
+            'scope1:second -> scope1:third',
+        ]))
+
+    def test_scoped_transition_names(self):
+        '''Scope: scoped and unscoped state names'''
+        class Scope1(Scope):
+            class Events:
+                bad = ['first__second']
+                goo = ['scope2:second__third']
+        Scope1.validate()
+        self.assertEqual(clean_dot(Scope1.graph()), set([
+            'scope1:first',
+            'scope1:second',
+            'scope2:second',
+            'scope2:third',
+            'scope1:first -> scope1:second',
+            'scope2:second -> scope2:third',
+        ]))
 
     # TODO: Triggers
 
-    # TODO: scoped names vs unscoped names
 
 
 class EngineTest(unittest.TestCase):
