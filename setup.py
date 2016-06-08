@@ -1,15 +1,11 @@
-"Simple Asset pipeline toolset"
+'''
+Simple Asset pipeline toolset
+'''
 import sys
 from setuptools import setup
 
 import workstate
 
-if sys.version_info[0:2] == (2, 6):
-    DEPS = ['ordereddict', 'six']
-    TEST_DEPS = ['unittest2']
-else:
-    DEPS = ['six']
-    TEST_DEPS = []
 
 setup(
     name='workstate',
@@ -24,8 +20,10 @@ setup(
     test_suite='workstate.test_suite',
 
     # Dependencies
-    install_requires=DEPS,
-    tests_require=TEST_DEPS,
+    install_requires=[
+        'six',
+    ],
+    tests_require=[],
 
     # Packages
     packages=['workstate'],
@@ -42,12 +40,12 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.2',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: pypy',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: Software Development :: Documentation',
     ]

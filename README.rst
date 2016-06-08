@@ -7,6 +7,9 @@ WorkState is a self-documenting Workflow-event state management system.
 .. image:: https://travis-ci.org/grigi/workstate.png
    :target: https://travis-ci.org/grigi/workstate
 
+.. image:: https://coveralls.io/repos/github/grigi/workstate/badge.svg?branch=master
+   :target: https://coveralls.io/github/grigi/workstate?branch=master
+
 **Note**:
 
     This is still in the toy phase, lots of basic requirements are not yet implemented (and some not even thought of yet)
@@ -67,6 +70,10 @@ A minimal example:
 
     class BookEngine(Engine):
         scopes = [Book, Chapter]
+
+This will generate a state-machine graph like so:
+
+.. image:: docs/bookengine.png
 
 
 Using the engine: (needs to change, invalid samples follow)
