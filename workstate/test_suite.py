@@ -286,7 +286,7 @@ class ScopeTest(unittest.TestCase):
                 gaa = ['*__third']
 
         Scope1.validate()
-        fname = '/tmp/%s.png' % uuid.uuid4()
+        fname = f'/tmp/{uuid.uuid4()}.png'
         Scope1.graph().render(fname)
         result = subprocess.Popen(['file', fname], stdout=subprocess.PIPE).communicate()[0]
         os.remove(fname)
@@ -485,7 +485,7 @@ class EngineTest(unittest.TestCase):
         class TestEngine(Engine):
             scopes = [Scope1]
 
-        fname = '/tmp/%s.png' % uuid.uuid4()
+        fname = f'/tmp/{uuid.uuid4()}.png'
         TestEngine.graph().render(fname)
         result = subprocess.Popen(['file', fname], stdout=subprocess.PIPE).communicate()[0]
         os.remove(fname)

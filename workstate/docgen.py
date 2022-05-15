@@ -18,24 +18,22 @@ class Digraph:
         result = []
 
         if label:
-            result.append('label=<%s>' % label)
+            result.append(f'label=<{label}>')
 
         if kwargs:
-            result.extend(['%s="%s"' % (k, v) for k, v in sorted(kwargs.items()) if v])
+            result.extend([f'{k}="{v}"' for k, v in sorted(kwargs.items()) if v])
 
         if result:
-            return ' [%s]' % ' '.join(result)
+            return f" [{' '.join(result)}]"
         return ''
 
     def node(self, name: str, label: str | None = None, **kwargs: str) -> None:
         '''Add a node'''
-        self.body.append('\t"%s"%s' % (name, self.attributes(label, kwargs)))
+        self.body.append(f'\t"{name}"{self.attributes(label, kwargs)}')
 
     def edge(self, tail_name: str, head_name: str, label: str | None = None, **kwargs: str) -> None:
         '''Add an edge'''
-        self.body.append(
-            '\t\t"%s" -> "%s"%s' % (tail_name, head_name, self.attributes(label, kwargs))
-        )
+        self.body.append(f'\t\t"{tail_name}" -> "{head_name}"{self.attributes(label, kwargs)}')
 
     def __str__(self) -> str:
         return (

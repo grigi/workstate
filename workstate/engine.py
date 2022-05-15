@@ -282,13 +282,13 @@ class Scope(metaclass=ScopeMeta):
             edge = transition.scope + ':' + transition.from_state + '__' + transition.to_state
             if not events.get(edge, None):
                 raise BrokenStateModelException(
-                    "Transition %s has no events that can trigger it" % key
+                    f"Transition {key} has no events that can trigger it"
                 )
 
         # Check that all events contains edges
         for key, val in _events.items():
             if not val.transitions:
-                raise BrokenStateModelException("Event %s contains no transitions" % key)
+                raise BrokenStateModelException(f"Event {key} contains no transitions")
 
         # Check that all states are connected
         initial = cls.get_initial()
@@ -321,7 +321,7 @@ class Scope(metaclass=ScopeMeta):
 
             if pool:
                 raise BrokenStateModelException(
-                    "States %s not reachable from initial state" % list(pool)
+                    f"States {list(pool)} not reachable from initial state"
                 )
 
     @classmethod
@@ -456,7 +456,7 @@ class Scope(metaclass=ScopeMeta):
                     color=FGCOLORS[col],
                 )
             for dest, scope in wildcards:
-                for event in events['%s:*__%s' % (cls.get_scope(), dest)]:
+                for event in events[f'{cls.get_scope()}:*__{dest}']:
                     pevent = event.replace('_', ' ').title()
                     dot.edge(canon('*', scope), canon(dest, scope), pevent, color=FGCOLORS[col])
 
@@ -599,8 +599,8 @@ class Engine(metaclass=EngineMeta):
 
         for idx, scope in enumerate(cls.get_scopes()):
             dot.body.append('subgraph cluster_%s {' % idx)
-            dot.body.append('label="%s"' % scope.get_scope().title())
-            dot.body.append('color="%s"' % FGCOLORS[idx + 1])
+            dot.body.append(f'label="{scope.get_scope().title()}"')
+            dot.body.append(f'color="{FGCOLORS[idx + 1]}"')
             scope.graph_scope(dot, col=idx + 1)
             dot.body.append('}')
         for idx, scope in enumerate(cls.get_scopes()):
@@ -629,13 +629,13 @@ class Engine(metaclass=EngineMeta):
             edge = transition.scope + ':' + transition.from_state + '__' + transition.to_state
             if not events.get(edge, None):
                 raise BrokenStateModelException(
-                    "Transition %s has no events that can trigger it" % key
+                    f"Transition {key} has no events that can trigger it"
                 )
 
         # Check that all events contains edges
         for key, val in _events.items():
             if not val.transitions:
-                raise BrokenStateModelException("Event %s contains no transitions" % key)
+                raise BrokenStateModelException(f"Event {key} contains no transitions")
 
         # Check that all states are connected
         for scope, initial in _scopes.items():
