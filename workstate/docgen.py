@@ -5,7 +5,7 @@ FGCOLORS = ['#333333', '#1b9e77', '#d95f02', '#7570b3', '#e7298a', '#66a61e', '#
 BGCOLORS = ['#dddddd', '#b3e2cd', '#fdcdac', '#cbd5e8', '#f4cae4', '#e6f5c9', '#fff2ae', '#f1e2cc']
 
 
-class Digraph(object):
+class Digraph:
     '''Builds a GraphViz digraph'''
 
     def __init__(self):

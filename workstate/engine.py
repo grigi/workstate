@@ -1,9 +1,5 @@
 '''WorkState engine'''
-from __future__ import print_function
-
 from collections import namedtuple
-
-from six import add_metaclass
 
 from workstate.docgen import Digraph, BGCOLORS, FGCOLORS
 
@@ -17,7 +13,7 @@ Transition = namedtuple('Transition', 'scope from_state to_state condition doc')
 Event = namedtuple('Event', 'event transitions triggers doc')
 Trigger = namedtuple('Trigger', 'name event states condition doc')
 
-class States(object):
+class States:
     '''State container'''
     def __init__(self, scope):
         self.scope = scope
@@ -55,7 +51,7 @@ class States(object):
         return repr(self.states)
 
 
-class Transitions(object):
+class Transitions:
     '''Transition container'''
     def __init__(self, scope, states):
         self.scope = scope
@@ -95,7 +91,7 @@ class Transitions(object):
         return repr(self.transitions)
 
 
-class Events(object):
+class Events:
     '''Event container'''
     def __init__(self, transs):
         self.transs = transs
@@ -121,7 +117,7 @@ class Events(object):
         return repr(self.events)
 
 
-class Triggers(object):
+class Triggers:
     '''Trigger container'''
     def __init__(self, events, states):
         self.events = events
@@ -223,8 +219,7 @@ class ScopeMeta(type):
         return type.__new__(mcs, name, parents, dct)
 
 
-@add_metaclass(ScopeMeta)
-class Scope(object):
+class Scope(metaclass=ScopeMeta):
     '''WorkState Scope'''
     __the_base_class__ = True
 
@@ -495,8 +490,7 @@ class EngineMeta(type):
         return cls
 
 
-@add_metaclass(EngineMeta)
-class Engine(object):
+class Engine(metaclass=EngineMeta):
     '''WorkState Engine'''
     __the_base_class__ = True
 

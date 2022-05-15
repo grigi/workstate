@@ -2,14 +2,10 @@
 import os
 import subprocess
 import uuid
-from pprint import pprint
 
 from workstate.engine import *
 
-try:
-    import unittest2 as unittest #pylint: disable=F0401
-except ImportError:
-    import unittest
+import unittest
 
 # pylint: disable=C1001,W0232,C0111,R0903
 
@@ -134,9 +130,7 @@ class ScopeTest(unittest.TestCase):
         class Scope1(Scope):
             initial = 'first'
         Scope1.validate()
-        self.assertEqual(clean_dot(Scope1.graph()), set([
-            'scope1:first',
-        ]))
+        self.assertEqual(clean_dot(Scope1.graph()), {'scope1:first'})
 
     def test_scope_edge_noevent(self):
         '''Scope: Edge without event'''
@@ -146,11 +140,8 @@ class ScopeTest(unittest.TestCase):
                 first__second = 'Some sample transition'
         with self.assertRaisesRegexp(BrokenStateModelException, 'Transition.*has no events'):
             Scope1.validate()
-        self.assertEqual(clean_dot(Scope1.graph()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope1:first -> scope1:second',
-        ]))
+        self.assertEqual(clean_dot(Scope1.graph()),
+                         {'scope1:first', 'scope1:second', 'scope1:first -> scope1:second'})
 
     def test_scope_edge_event(self):
         '''Scope: Edge with event'''
@@ -159,11 +150,8 @@ class ScopeTest(unittest.TestCase):
             class Events:
                 goo = ['first__second']
         Scope1.validate()
-        self.assertEqual(clean_dot(Scope1.graph()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope1:first -> scope1:second',
-        ]))
+        self.assertEqual(clean_dot(Scope1.graph()),
+                         {'scope1:first', 'scope1:second', 'scope1:first -> scope1:second'})
 
     def test_scope_loose_states(self):
         '''Scope: Disconnected states'''
@@ -182,14 +170,9 @@ class ScopeTest(unittest.TestCase):
                 goo = ['first__second']
                 gaa = ['*__third']
         Scope1.validate()
-        self.assertEqual(clean_dot(Scope1.graph()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope1:third',
-            'scope1:*',
-            'scope1:first -> scope1:second',
-            'scope1:* -> scope1:third',
-        ]))
+        self.assertEqual(clean_dot(Scope1.graph()),
+                         {'scope1:first', 'scope1:second', 'scope1:third', 'scope1:*',
+                          'scope1:first -> scope1:second', 'scope1:* -> scope1:third'})
 
     def test_define_states(self):
         '''Scope: Defining states'''
@@ -201,17 +184,10 @@ class ScopeTest(unittest.TestCase):
                 do_it = 'Yup, you gotta DO it'
         states = Scope1.get_parsed()['states'].states
         # Check that states are there
-        self.assertEqual(set(states.keys()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope1:do_it',
-        ]))
+        self.assertEqual(set(states.keys()), {'scope1:first', 'scope1:second', 'scope1:do_it'})
         # Check that docs got transferred
-        self.assertEqual(set([a.doc for a in states.values()]), set([
-            'The first',
-            'The second',
-            'Yup, you gotta DO it',
-        ]))
+        self.assertEqual(set([a.doc for a in states.values()]),
+                         {'The first', 'The second', 'Yup, you gotta DO it'})
         # Of course validation should fail as this is an incomplete scope
         with self.assertRaisesRegexp(BrokenStateModelException, 'States.*not reachable'):
             Scope1.validate()
@@ -224,14 +200,10 @@ class ScopeTest(unittest.TestCase):
                 bad = ['first__third']
                 goo = ['first__second', 'third__second']
         Scope1.validate()
-        self.assertEqual(clean_dot(Scope1.graph()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope1:third',
-            'scope1:first -> scope1:second',
-            'scope1:first -> scope1:third',
-            'scope1:third -> scope1:second',
-        ]))
+        self.assertEqual(clean_dot(Scope1.graph()),
+                         {'scope1:first', 'scope1:second', 'scope1:third',
+                          'scope1:first -> scope1:second', 'scope1:first -> scope1:third',
+                          'scope1:third -> scope1:second'})
 
     def test_validator_handles_loops(self):
         '''Scope: Validator doesn't choke on loops'''
@@ -242,15 +214,10 @@ class ScopeTest(unittest.TestCase):
                 retry = ['second__third']
                 goo = ['first__second', 'third__second']
         Scope1.validate()
-        self.assertEqual(clean_dot(Scope1.graph()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope1:third',
-            'scope1:first -> scope1:second',
-            'scope1:first -> scope1:first',
-            'scope1:third -> scope1:second',
-            'scope1:second -> scope1:third',
-        ]))
+        self.assertEqual(clean_dot(Scope1.graph()),
+                         {'scope1:first', 'scope1:second', 'scope1:third',
+                          'scope1:first -> scope1:second', 'scope1:first -> scope1:first',
+                          'scope1:third -> scope1:second', 'scope1:second -> scope1:third'})
 
     def test_scope_generate_png(self):
         '''Scope: Generate PNG graph'''
@@ -276,11 +243,8 @@ class ScopeTest(unittest.TestCase):
                     return False
         with self.assertRaisesRegexp(BrokenStateModelException, 'Transition.*has no events'):
             Scope1.validate()
-        self.assertEqual(clean_dot(Scope1.graph()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope1:first -> scope1:second',
-        ]))
+        self.assertEqual(clean_dot(Scope1.graph()),
+                         {'scope1:first', 'scope1:second', 'scope1:first -> scope1:second'})
 
     def test_scoped_state_names(self):
         '''Scope: scoped and unscoped state names'''
@@ -290,13 +254,9 @@ class ScopeTest(unittest.TestCase):
                 bad = ['first__second']
                 goo = ['scope1:second__third']
         Scope1.validate()
-        self.assertEqual(clean_dot(Scope1.graph()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope1:third',
-            'scope1:first -> scope1:second',
-            'scope1:second -> scope1:third',
-        ]))
+        self.assertEqual(clean_dot(Scope1.graph()),
+                         {'scope1:first', 'scope1:second', 'scope1:third',
+                          'scope1:first -> scope1:second', 'scope1:second -> scope1:third'})
 
     def test_scoped_transition_names(self):
         '''Scope: scoped and unscoped transition names'''
@@ -305,14 +265,9 @@ class ScopeTest(unittest.TestCase):
                 bad = ['first__second']
                 goo = ['scope2:second__third']
         Scope1.validate()
-        self.assertEqual(clean_dot(Scope1.graph()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope2:second',
-            'scope2:third',
-            'scope1:first -> scope1:second',
-            'scope2:second -> scope2:third',
-        ]))
+        self.assertEqual(clean_dot(Scope1.graph()),
+                         {'scope1:first', 'scope1:second', 'scope2:second', 'scope2:third',
+                          'scope1:first -> scope1:second', 'scope2:second -> scope2:third'})
 
     def test_missing_event_trigger(self):
         '''Scope: Missing event on trigger'''
@@ -339,13 +294,9 @@ class ScopeTest(unittest.TestCase):
                 def check_complete(self):
                     return True
         Scope1.validate()
-        self.assertEqual(clean_dot(Scope1.graph()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope1:third',
-            'scope1:first -> scope1:second',
-            'scope1:second -> scope1:third',
-        ]))
+        self.assertEqual(clean_dot(Scope1.graph()),
+                         {'scope1:first', 'scope1:second', 'scope1:third',
+                          'scope1:first -> scope1:second', 'scope1:second -> scope1:third'})
 
 
 class EngineTest(unittest.TestCase):
@@ -394,14 +345,9 @@ class EngineTest(unittest.TestCase):
                 goo = ['first__second']
         class TestEngine(Engine):
             scopes = [Scope1, Scope2]
-        self.assertEqual(clean_dot(TestEngine.graph()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope1:first -> scope1:second',
-            'scope2:first',
-            'scope2:second',
-            'scope2:first -> scope2:second',
-        ]))
+        self.assertEqual(clean_dot(TestEngine.graph()),
+                         {'scope1:first', 'scope1:second', 'scope1:first -> scope1:second',
+                          'scope2:first', 'scope2:second', 'scope2:first -> scope2:second'})
 
     def test_engine_generate_png(self):
         '''Engine: Generate PNG graph'''
@@ -441,14 +387,9 @@ class EngineTest(unittest.TestCase):
                 goo = ['first__second', 'scope1:first__second']
         class TestEngine(Engine):
             scopes = [Scope1, Scope2]
-        self.assertEqual(clean_dot(TestEngine.graph()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope1:first -> scope1:second',
-            'scope2:first',
-            'scope2:second',
-            'scope2:first -> scope2:second',
-        ]))
+        self.assertEqual(clean_dot(TestEngine.graph()),
+                         {'scope1:first', 'scope1:second', 'scope1:first -> scope1:second',
+                          'scope2:first', 'scope2:second', 'scope2:first -> scope2:second'})
 
     def test_cross_scope_trigger_edges(self):
         '''Engine: Cross-scope trigger edges'''
@@ -466,18 +407,11 @@ class EngineTest(unittest.TestCase):
                     return True
         class TestEngine(Engine):
             scopes = [Scope1, Scope2]
-        self.assertEqual(clean_dot(TestEngine.graph()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope1:first -> scope1:second',
-            'scope2:first',
-            'scope2:second',
-            'scope2:third',
-            'scope2:first -> scope2:second',
-            'scope2:second -> scope2:third',
-            'scope1:second -> scope2:second',
-            'scope1:second -> scope2:third',
-        ]))
+        self.assertEqual(clean_dot(TestEngine.graph()),
+                         {'scope1:first', 'scope1:second', 'scope1:first -> scope1:second',
+                          'scope2:first', 'scope2:second', 'scope2:third',
+                          'scope2:first -> scope2:second', 'scope2:second -> scope2:third',
+                          'scope1:second -> scope2:second', 'scope1:second -> scope2:third'})
 
     @unittest.expectedFailure
     def test_cross_scope_trigger_events(self):
@@ -496,15 +430,10 @@ class EngineTest(unittest.TestCase):
                 bar = ['first__second']
         class TestEngine(Engine):
             scopes = [Scope1, Scope2]
-        self.assertEqual(clean_dot(TestEngine.graph()), set([
-            'scope1:first',
-            'scope1:second',
-            'scope1:first -> scope1:second',
-            'scope2:first',
-            'scope2:second',
-            'scope2:first -> scope2:second',
-            'scope1:second -> scope2:second',
-        ]))
+        self.assertEqual(clean_dot(TestEngine.graph()),
+                         {'scope1:first', 'scope1:second', 'scope1:first -> scope1:second',
+                          'scope2:first', 'scope2:second', 'scope2:first -> scope2:second',
+                          'scope1:second -> scope2:second'})
 
 
 if __name__ == '__main__':
