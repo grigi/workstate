@@ -1,4 +1,6 @@
 '''WorkState engine'''
+from __future__ import annotations
+from typing import Dict
 from collections import namedtuple
 
 from workstate.docgen import Digraph, BGCOLORS, FGCOLORS
@@ -20,11 +22,11 @@ Trigger = namedtuple('Trigger', 'name event states condition doc')
 class States:
     '''State container'''
 
-    def __init__(self, scope):
+    def __init__(self, scope: str|None) -> None:
         self.scope = scope
-        self.states = {}
+        self.states: Dict[str, State] = {}
 
-    def fullname(self, name, scope=None):
+    def fullname(self, name: str, scope: str|None=None) -> str:
         '''Returns canonical name'''
         if ':' in name:
             return name
@@ -35,7 +37,7 @@ class States:
             else:
                 return scope + ':' + name
 
-    def ensure_state(self, name, doc=None):
+    def ensure_state(self, name: str, doc: str|None=None) -> State:
         '''Ensures that a state exists'''
         fqsn = self.fullname(name)
 
@@ -48,11 +50,11 @@ class States:
     def merge_state(self, obj):
         self.ensure_state(obj.scope + ':' + obj.state, obj.doc)
 
-    def get_state(self, name, scope=None):
+    def get_state(self, name: str, scope: str|None=None) -> State:
         '''Return state object'''
         return self.states[self.fullname(name, scope)]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(self.states)
 
 

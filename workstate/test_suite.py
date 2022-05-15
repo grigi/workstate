@@ -2,6 +2,7 @@
 import os
 import subprocess
 import uuid
+from typing import Set
 
 from workstate.docgen import Digraph
 from workstate.engine import Engine, Scope, BrokenStateModelException, trigger
@@ -113,7 +114,7 @@ BookEngine.graph().render('bookengine.png')
 """
 
 
-def clean_dot(dot: Digraph) -> set[str]:
+def clean_dot(dot: Digraph) -> Set[str]:
     '''Cleans out formatting from dot input'''
     return {
         val.split('[')[0].replace('"', '').strip()

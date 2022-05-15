@@ -1,5 +1,6 @@
 '''Documentation generation module for WorkState'''
 from __future__ import annotations
+from typing import Dict
 
 import subprocess
 
@@ -13,7 +14,7 @@ class Digraph:
     def __init__(self) -> None:
         self.body: list[str] = []
 
-    def attributes(self, label: str | None, kwargs: dict[str, str]) -> str:
+    def attributes(self, label: str | None, kwargs: Dict[str, str]) -> str:
         '''Return assembled DOT attributes string.'''
         result = []
 
