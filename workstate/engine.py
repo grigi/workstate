@@ -364,7 +364,7 @@ class Scope(metaclass=ScopeMeta):
             return states.keys()
 
     @classmethod
-    def graph_scope(cls, dot=None, col=0):
+    def graph_scope(cls, dot=None, col=0) -> Digraph:
         '''Generates dot graph for provided scope'''
         if not dot:
             dot = Digraph()
@@ -372,9 +372,9 @@ class Scope(metaclass=ScopeMeta):
         initial = cls.get_initial()
         transitions = cls.get_parsed()['transs'].transitions
         events = cls.get_event_map()
-        triggers = dict(
-            [(a.event, (b, a.states)) for b, a in cls.get_parsed()['trigrs'].triggers.items()]
-        )
+        triggers = {
+            a.event: (b, a.states) for b, a in cls.get_parsed()['trigrs'].triggers.items()
+        }
 
         def canon(val, scope=None):
             '''Returns canonical edge name'''
@@ -446,7 +446,7 @@ class Scope(metaclass=ScopeMeta):
                 wildcards.add((edge.to_state, edge.scope))
 
         if wildcards:
-            for scope in set([_wc[1] for _wc in wildcards]):
+            for scope in {_wc[1] for _wc in wildcards}:
                 dot.node(
                     canon('*', scope),
                     'Any',
@@ -467,9 +467,9 @@ class Scope(metaclass=ScopeMeta):
         '''Generates dot graph for non-edge triggers'''
         transitions = cls.get_parsed()['transs'].transitions
         events = cls.get_event_map()
-        triggers = dict(
-            [(a.event, (b, a.states)) for b, a in cls.get_parsed()['trigrs'].triggers.items()]
-        )
+        triggers = {
+            a.event: (b, a.states) for b, a in cls.get_parsed()['trigrs'].triggers.items()
+        }
 
         def canon(val):
             '''Returns canonical edge name'''
@@ -496,7 +496,7 @@ class Scope(metaclass=ScopeMeta):
         return dot
 
     @classmethod
-    def graph(cls, dot=None, col=0, trigger_edges=False):
+    def graph(cls, dot=None, col=0, trigger_edges=False) -> Digraph:
         '''Generates dot graph for provided scope'''
         dot = cls.graph_scope(dot, col)
         if trigger_edges:
@@ -546,7 +546,7 @@ class EngineMeta(type):
                 for trigger in spar['trigrs'].triggers.values():
                     triggers.merge_trigger(trigger)
 
-            scopenames = set([a.scope for a in states.states.values()])
+            scopenames = {a.scope for a in states.states.values()}
             for name in scopenames:
                 try:
                     scopes[name] = [a.get_initial() for a in _scopes if a.get_scope() == name][0]
@@ -640,7 +640,7 @@ class Engine(metaclass=EngineMeta):
         # Check that all states are connected
         for scope, initial in _scopes.items():
             if initial:
-                pool = set([a for a, b in _states.items() if b.scope == scope])
+                pool = {a for a, b in _states.items() if b.scope == scope}
                 order = []
 
                 def mark_states(statename):

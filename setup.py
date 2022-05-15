@@ -20,9 +20,7 @@ setup(
     test_suite='workstate.test_suite',
 
     # Dependencies
-    install_requires=[
-        'six',
-    ],
+    install_requires=[],
     tests_require=[],
 
     # Packages

@@ -3,7 +3,8 @@ import os
 import subprocess
 import uuid
 
-from workstate.engine import *
+from workstate.docgen import Digraph
+from workstate.engine import Engine, Scope, BrokenStateModelException, trigger
 
 import unittest
 
@@ -112,9 +113,13 @@ BookEngine.graph().render('bookengine.png')
 """
 
 
-def clean_dot(dot):
+def clean_dot(dot: Digraph) -> set[str]:
     '''Cleans out formatting from dot input'''
-    return set([val.split('[')[0].replace('"', '').strip() for val in dot.body if '\t' in val])
+    return {
+        val.split('[')[0].replace('"', '').strip()
+        for val in dot.body
+        if '\t' in val
+    }
 
 
 class ScopeTest(unittest.TestCase):
@@ -147,7 +152,7 @@ class ScopeTest(unittest.TestCase):
             class Transitions:
                 first__second = 'Some sample transition'
 
-        with self.assertRaisesRegexp(BrokenStateModelException, 'Transition.*has no events'):
+        with self.assertRaisesRegex(BrokenStateModelException, 'Transition.*has no events'):
             Scope1.validate()
         self.assertEqual(
             clean_dot(Scope1.graph()),
@@ -178,7 +183,7 @@ class ScopeTest(unittest.TestCase):
             class Events:
                 goo = ['first__second', 'third__fourth']
 
-        with self.assertRaisesRegexp(BrokenStateModelException, 'States.*not reachable'):
+        with self.assertRaisesRegex(BrokenStateModelException, 'States.*not reachable'):
             Scope1.validate()
 
     def test_wildcard_edge(self):
@@ -220,11 +225,11 @@ class ScopeTest(unittest.TestCase):
         self.assertEqual(set(states.keys()), {'scope1:first', 'scope1:second', 'scope1:do_it'})
         # Check that docs got transferred
         self.assertEqual(
-            set([a.doc for a in states.values()]),
+            {a.doc for a in states.values()},
             {'The first', 'The second', 'Yup, you gotta DO it'},
         )
         # Of course validation should fail as this is an incomplete scope
-        with self.assertRaisesRegexp(BrokenStateModelException, 'States.*not reachable'):
+        with self.assertRaisesRegex(BrokenStateModelException, 'States.*not reachable'):
             Scope1.validate()
 
     def test_listed_transition(self):
@@ -303,7 +308,7 @@ class ScopeTest(unittest.TestCase):
                     '''A Conditional transition'''
                     return False
 
-        with self.assertRaisesRegexp(BrokenStateModelException, 'Transition.*has no events'):
+        with self.assertRaisesRegex(BrokenStateModelException, 'Transition.*has no events'):
             Scope1.validate()
         self.assertEqual(
             clean_dot(Scope1.graph()),
@@ -367,7 +372,7 @@ class ScopeTest(unittest.TestCase):
                 def check_complete(self):
                     return True
 
-        with self.assertRaisesRegexp(BrokenStateModelException, "Event.*contains no transitions"):
+        with self.assertRaisesRegex(BrokenStateModelException, "Event.*contains no transitions"):
             Scope1.validate()
 
     def test_basic_trigger(self):
@@ -403,21 +408,21 @@ class EngineTest(unittest.TestCase):
 
     def test_empty_engine(self):
         '''Engine: Empty'''
-        with self.assertRaisesRegexp(BrokenStateModelException, "Engine needs scopes"):
+        with self.assertRaisesRegex(BrokenStateModelException, "Engine needs scopes"):
 
             class TestEngine(Engine):
                 pass
 
     def test_engine_scope_non_list(self):
         '''Engine: scopes not in a List'''
-        with self.assertRaisesRegexp(BrokenStateModelException, "Engine needs scopes"):
+        with self.assertRaisesRegex(BrokenStateModelException, "Engine needs scopes"):
 
             class TestEngine(Engine):
                 scopes = "moo"
 
     def test_engine_scope_non_scopes(self):
         '''Engine: List doesn't contain Scopes'''
-        with self.assertRaisesRegexp(BrokenStateModelException, "Engine needs scopes"):
+        with self.assertRaisesRegex(BrokenStateModelException, "Engine needs scopes"):
 
             class TestEngine(Engine):
                 scopes = ["moo"]
@@ -501,7 +506,7 @@ class EngineTest(unittest.TestCase):
                 goo = ['first__second']
                 gaa = ['fourth__third']
 
-        with self.assertRaisesRegexp(BrokenStateModelException, 'States.*not reachable'):
+        with self.assertRaisesRegex(BrokenStateModelException, 'States.*not reachable'):
 
             class TestEngine(Engine):
                 scopes = [Scope1]
