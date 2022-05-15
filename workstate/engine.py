@@ -5,16 +5,21 @@ from workstate.docgen import Digraph, BGCOLORS, FGCOLORS
 
 __all__ = ['Engine', 'Scope', 'BrokenStateModelException', 'trigger']
 
+
 class BrokenStateModelException(Exception):
     pass
 
+
+# Convert to Enums
 State = namedtuple('State', 'scope state source_edges dest_edges triggers doc')
 Transition = namedtuple('Transition', 'scope from_state to_state condition doc')
 Event = namedtuple('Event', 'event transitions triggers doc')
 Trigger = namedtuple('Trigger', 'name event states condition doc')
 
+
 class States:
     '''State container'''
+
     def __init__(self, scope):
         self.scope = scope
         self.states = {}
@@ -26,9 +31,9 @@ class States:
         else:
             _scope = self.scope
             if _scope:
-                return self.scope+':'+name
+                return self.scope + ':' + name
             else:
-                return scope+':'+name
+                return scope + ':' + name
 
     def ensure_state(self, name, doc=None):
         '''Ensures that a state exists'''
@@ -41,7 +46,7 @@ class States:
         return self.states[fqsn]
 
     def merge_state(self, obj):
-        self.ensure_state(obj.scope+':'+obj.state, obj.doc)
+        self.ensure_state(obj.scope + ':' + obj.state, obj.doc)
 
     def get_state(self, name, scope=None):
         '''Return state object'''
@@ -53,6 +58,7 @@ class States:
 
 class Transitions:
     '''Transition container'''
+
     def __init__(self, scope, states):
         self.scope = scope
         self.states = states
@@ -66,7 +72,7 @@ class Transitions:
             (from_state, to_state) = name.split('__')
             if not from_state or from_state == '_Transitions':
                 from_state = '*'
-            return self.scope+':'+from_state+'__'+to_state
+            return self.scope + ':' + from_state + '__' + to_state
 
     def ensure_transition(self, name, condition=None, doc=None):
         '''Ensures that a transition exists'''
@@ -76,16 +82,18 @@ class Transitions:
             (scope, edge) = fqsn.split(':')
             (from_state, to_state) = edge.split('__')
             if from_state != '*':
-                fstate = self.states.ensure_state(scope+':'+from_state)
+                fstate = self.states.ensure_state(scope + ':' + from_state)
                 fstate.dest_edges.append(fqsn)
-            tstate = self.states.ensure_state(scope+':'+to_state)
+            tstate = self.states.ensure_state(scope + ':' + to_state)
             tstate.source_edges.append(fqsn)
             self.transitions[fqsn] = Transition(scope, from_state, to_state, condition, doc)
 
         return fqsn
 
     def merge_transition(self, obj):
-        self.ensure_transition(obj.scope+':'+obj.from_state+'__'+obj.to_state, obj.condition, obj.doc)
+        self.ensure_transition(
+            obj.scope + ':' + obj.from_state + '__' + obj.to_state, obj.condition, obj.doc
+        )
 
     def __repr__(self):
         return repr(self.transitions)
@@ -93,6 +101,7 @@ class Transitions:
 
 class Events:
     '''Event container'''
+
     def __init__(self, transs):
         self.transs = transs
         self.events = {}
@@ -119,6 +128,7 @@ class Events:
 
 class Triggers:
     '''Trigger container'''
+
     def __init__(self, events, states):
         self.events = events
         self.states = states
@@ -150,6 +160,7 @@ class Triggers:
 
 class ScopeMeta(type):
     '''Meta-Class for Scope'''
+
     def __new__(mcs, name, parents, dct):
         if '__the_base_class__' not in dct:
             # create a class_id if it's not specified
@@ -167,7 +178,7 @@ class ScopeMeta(type):
                 'states': states,
                 'transs': transs,
                 'events': events,
-                'trigrs': triggers
+                'trigrs': triggers,
             }
 
             if 'States' in dct:
@@ -177,14 +188,14 @@ class ScopeMeta(type):
                     states.ensure_state(key, doc=getattr(dct_states, key))
 
             if 'initial' in dct:
-                states.ensure_state(scope+':'+dct['initial'])
+                states.ensure_state(scope + ':' + dct['initial'])
 
             if 'Transitions' in dct:
                 dct_transs = dct['Transitions']
                 transkeys = [key for key in dir(dct_transs) if not key.startswith('__')]
                 for key in transkeys:
                     item = getattr(dct_transs, key)
-                    #mkey = key.
+                    # mkey = key.
                     if callable(item):
                         transs.ensure_transition(key, condition=item, doc=item.__doc__)
                     else:
@@ -204,7 +215,9 @@ class ScopeMeta(type):
                             edges = [a for a in val if isinstance(a, list)][0]
                             doc = [a for a in val if isinstance(a, str)][0]
                         except IndexError:
-                            raise BrokenStateModelException('Events need to be one of: [], ("",[]), ([],"")')
+                            raise BrokenStateModelException(
+                                'Events need to be one of: [], ("",[]), ([],"")'
+                            )
                         events.update_event(key, edges, doc)
 
             if 'Triggers' in dct:
@@ -212,8 +225,9 @@ class ScopeMeta(type):
                 tri_funs = [key for key in dir(dct_trigrs) if not key.startswith('__')]
                 for _tf in tri_funs:
                     tri_fun = getattr(dct_trigrs, _tf)
-                    triggers.add_trigger(tri_fun.__name__, tri_fun.event, tri_fun.states, tri_fun, tri_fun.__doc__)
-
+                    triggers.add_trigger(
+                        tri_fun.__name__, tri_fun.event, tri_fun.states, tri_fun, tri_fun.__doc__
+                    )
 
         # we need to call type.__new__ to complete the initialization
         return type.__new__(mcs, name, parents, dct)
@@ -221,6 +235,7 @@ class ScopeMeta(type):
 
 class Scope(metaclass=ScopeMeta):
     '''WorkState Scope'''
+
     __the_base_class__ = True
 
     @classmethod
@@ -264,9 +279,11 @@ class Scope(metaclass=ScopeMeta):
 
         # Check that each edge has an event that can trigger it
         for key, transition in _transitions.transitions.items():
-            edge = transition.scope+':'+transition.from_state+'__'+transition.to_state
+            edge = transition.scope + ':' + transition.from_state + '__' + transition.to_state
             if not events.get(edge, None):
-                raise BrokenStateModelException("Transition %s has no events that can trigger it" % key)
+                raise BrokenStateModelException(
+                    "Transition %s has no events that can trigger it" % key
+                )
 
         # Check that all events contains edges
         for key, val in _events.items():
@@ -286,10 +303,11 @@ class Scope(metaclass=ScopeMeta):
                     order.append(statename)
                 state = _states[statename]
                 dest_edges = [_transitions.transitions[edge] for edge in state.dest_edges]
-                dest_states = [a.scope+':'+a.to_state for a in dest_edges]
+                dest_states = [a.scope + ':' + a.to_state for a in dest_edges]
                 for substate in set(dest_states).intersection(pool):
                     mark_states(substate)
-            mark_states(scope+':'+initial)
+
+            mark_states(scope + ':' + initial)
 
             # Wildcard states
             for event in events.keys():
@@ -302,7 +320,9 @@ class Scope(metaclass=ScopeMeta):
                             order.append(_state)
 
             if pool:
-                raise BrokenStateModelException("States %s not reachable from initial state" % list(pool))
+                raise BrokenStateModelException(
+                    "States %s not reachable from initial state" % list(pool)
+                )
 
     @classmethod
     def order_states(cls):
@@ -323,10 +343,11 @@ class Scope(metaclass=ScopeMeta):
                     order.append(statename)
                 state = states[statename]
                 dest_edges = [transitions[edge] for edge in state.dest_edges]
-                dest_states = [a.scope+':'+a.to_state for a in dest_edges]
+                dest_states = [a.scope + ':' + a.to_state for a in dest_edges]
                 for substate in set(dest_states).intersection(pool):
                     mark_states(substate)
-            mark_states(scope+':'+initial)
+
+            mark_states(scope + ':' + initial)
 
             # Wildcard states go last
             for event in events.keys():
@@ -351,24 +372,41 @@ class Scope(metaclass=ScopeMeta):
         initial = cls.get_initial()
         transitions = cls.get_parsed()['transs'].transitions
         events = cls.get_event_map()
-        triggers = dict([(a.event, (b, a.states)) for b, a in cls.get_parsed()['trigrs'].triggers.items()])
+        triggers = dict(
+            [(a.event, (b, a.states)) for b, a in cls.get_parsed()['trigrs'].triggers.items()]
+        )
 
         def canon(val, scope=None):
             '''Returns canonical edge name'''
             if ':' in val:
                 return val
             if scope:
-                return scope+':'+val
+                return scope + ':' + val
             else:
-                return cls.get_scope()+':'+val
+                return cls.get_scope() + ':' + val
 
         for fullstate in cls.order_states():
             state = fullstate.split(':')[1]
             pretty = state.replace('_', ' ').title()
             if state == initial:
-                dot.node(fullstate, pretty, shape='oval', rank="max", style="bold,filled", fillcolor=BGCOLORS[col], color=FGCOLORS[col])
+                dot.node(
+                    fullstate,
+                    pretty,
+                    shape='oval',
+                    rank="max",
+                    style="bold,filled",
+                    fillcolor=BGCOLORS[col],
+                    color=FGCOLORS[col],
+                )
             else:
-                dot.node(fullstate, pretty, shape='rectangle', style="filled,rounded", fillcolor=BGCOLORS[col], color=FGCOLORS[col])
+                dot.node(
+                    fullstate,
+                    pretty,
+                    shape='rectangle',
+                    style="filled,rounded",
+                    fillcolor=BGCOLORS[col],
+                    color=FGCOLORS[col],
+                )
 
         for name, edge in transitions.items():
             if edge.from_state != '*':
@@ -379,18 +417,44 @@ class Scope(metaclass=ScopeMeta):
                         style = "dashed" if edge.condition else "solid"
                         if _trigger:
                             tname = _trigger[0].split(':')[1]
-                            pretty = pevent+' <SUP><FONT POINT-SIZE="10">('+tname+')</FONT></SUP>'
-                            dot.edge(canon(edge.from_state, edge.scope), canon(edge.to_state, edge.scope), pretty, style=style, color=FGCOLORS[col])
+                            pretty = (
+                                pevent + ' <SUP><FONT POINT-SIZE="10">(' + tname + ')</FONT></SUP>'
+                            )
+                            dot.edge(
+                                canon(edge.from_state, edge.scope),
+                                canon(edge.to_state, edge.scope),
+                                pretty,
+                                style=style,
+                                color=FGCOLORS[col],
+                            )
                         else:
-                            dot.edge(canon(edge.from_state, edge.scope), canon(edge.to_state, edge.scope), pevent, style=style, color=FGCOLORS[col])
+                            dot.edge(
+                                canon(edge.from_state, edge.scope),
+                                canon(edge.to_state, edge.scope),
+                                pevent,
+                                style=style,
+                                color=FGCOLORS[col],
+                            )
                 else:
-                    dot.edge(canon(edge.from_state, edge.scope), canon(edge.to_state, edge.scope), style="dotted", color=FGCOLORS[col])
+                    dot.edge(
+                        canon(edge.from_state, edge.scope),
+                        canon(edge.to_state, edge.scope),
+                        style="dotted",
+                        color=FGCOLORS[col],
+                    )
             else:
                 wildcards.add((edge.to_state, edge.scope))
 
         if wildcards:
             for scope in set([_wc[1] for _wc in wildcards]):
-                dot.node(canon('*', scope), 'Any', shape='none', style="filled", fillcolor=BGCOLORS[col], color=FGCOLORS[col])
+                dot.node(
+                    canon('*', scope),
+                    'Any',
+                    shape='none',
+                    style="filled",
+                    fillcolor=BGCOLORS[col],
+                    color=FGCOLORS[col],
+                )
             for dest, scope in wildcards:
                 for event in events['%s:*__%s' % (cls.get_scope(), dest)]:
                     pevent = event.replace('_', ' ').title()
@@ -403,14 +467,15 @@ class Scope(metaclass=ScopeMeta):
         '''Generates dot graph for non-edge triggers'''
         transitions = cls.get_parsed()['transs'].transitions
         events = cls.get_event_map()
-        triggers = dict([(a.event, (b, a.states)) for b, a in cls.get_parsed()['trigrs'].triggers.items()])
+        triggers = dict(
+            [(a.event, (b, a.states)) for b, a in cls.get_parsed()['trigrs'].triggers.items()]
+        )
 
         def canon(val):
             '''Returns canonical edge name'''
             if ':' in val:
                 return val
-            return cls.get_scope()+':'+val
-
+            return cls.get_scope() + ':' + val
 
         for name, edge in transitions.items():
             if edge.from_state != '*':
@@ -420,10 +485,15 @@ class Scope(metaclass=ScopeMeta):
                         tname = _trigger[0].split(':')[1]
                         for trig in _trigger[1]:
                             if trig != edge.from_state:
-                                dot.edge(canon(trig), canon(edge.to_state), '<FONT POINT-SIZE="10">'+tname+'</FONT>', style="dotted", color=FGCOLORS[col])
+                                dot.edge(
+                                    canon(trig),
+                                    canon(edge.to_state),
+                                    '<FONT POINT-SIZE="10">' + tname + '</FONT>',
+                                    style="dotted",
+                                    color=FGCOLORS[col],
+                                )
 
         return dot
-
 
     @classmethod
     def graph(cls, dot=None, col=0, trigger_edges=False):
@@ -434,8 +504,10 @@ class Scope(metaclass=ScopeMeta):
 
         return dot
 
+
 class EngineMeta(type):
     '''Meta-Class for Engine'''
+
     def __new__(mcs, name, parents, dct):
         if '__the_base_class__' not in dct:
             if 'scopes' not in dct or not isinstance(dct['scopes'], list):
@@ -456,7 +528,7 @@ class EngineMeta(type):
                 'states': states,
                 'transs': transs,
                 'events': events,
-                'trigrs': triggers
+                'trigrs': triggers,
             }
 
             for scope in _scopes:
@@ -481,9 +553,8 @@ class EngineMeta(type):
                 except IndexError:
                     scopes[name] = None
 
-
         # we need to call type.__new__ to complete the initialization
-        cls =  type.__new__(mcs, name, parents, dct)
+        cls = type.__new__(mcs, name, parents, dct)
         if '__the_base_class__' not in dct:
             # Validate the Engine to ensure it is sane
             cls.validate()
@@ -492,6 +563,7 @@ class EngineMeta(type):
 
 class Engine(metaclass=EngineMeta):
     '''WorkState Engine'''
+
     __the_base_class__ = True
 
     @classmethod
@@ -528,11 +600,11 @@ class Engine(metaclass=EngineMeta):
         for idx, scope in enumerate(cls.get_scopes()):
             dot.body.append('subgraph cluster_%s {' % idx)
             dot.body.append('label="%s"' % scope.get_scope().title())
-            dot.body.append('color="%s"' % FGCOLORS[idx+1])
-            scope.graph_scope(dot, col=idx+1)
+            dot.body.append('color="%s"' % FGCOLORS[idx + 1])
+            scope.graph_scope(dot, col=idx + 1)
             dot.body.append('}')
         for idx, scope in enumerate(cls.get_scopes()):
-            scope.graph_triggers(dot, col=idx+1)
+            scope.graph_triggers(dot, col=idx + 1)
 
         return dot
 
@@ -554,9 +626,11 @@ class Engine(metaclass=EngineMeta):
 
         # Check that each edge has an event that can trigger it
         for key, transition in _transitions.transitions.items():
-            edge = transition.scope+':'+transition.from_state+'__'+transition.to_state
+            edge = transition.scope + ':' + transition.from_state + '__' + transition.to_state
             if not events.get(edge, None):
-                raise BrokenStateModelException("Transition %s has no events that can trigger it" % key)
+                raise BrokenStateModelException(
+                    "Transition %s has no events that can trigger it" % key
+                )
 
         # Check that all events contains edges
         for key, val in _events.items():
@@ -566,7 +640,7 @@ class Engine(metaclass=EngineMeta):
         # Check that all states are connected
         for scope, initial in _scopes.items():
             if initial:
-                pool = set([a for a,b in _states.items() if b.scope == scope])
+                pool = set([a for a, b in _states.items() if b.scope == scope])
                 order = []
 
                 def mark_states(statename):
@@ -576,10 +650,11 @@ class Engine(metaclass=EngineMeta):
                         order.append(statename)
                     state = _states[statename]
                     dest_edges = [_transitions.transitions[edge] for edge in state.dest_edges]
-                    dest_states = [a.scope+':'+a.to_state for a in dest_edges]
+                    dest_states = [a.scope + ':' + a.to_state for a in dest_edges]
                     for substate in set(dest_states).intersection(pool):
                         mark_states(substate)
-                mark_states(scope+':'+initial)
+
+                mark_states(scope + ':' + initial)
 
                 # Wildcard states
                 for event in events.keys():
@@ -592,15 +667,19 @@ class Engine(metaclass=EngineMeta):
                                 order.append(_state)
 
                 if pool:
-                    raise BrokenStateModelException("States %s not reachable from initial state in scope %s" % (list(pool), scope))
+                    raise BrokenStateModelException(
+                        "States %s not reachable from initial state in scope %s"
+                        % (list(pool), scope)
+                    )
 
 
 def trigger(event, states):
     '''Annotates the condition function with event and states attributes'''
+
     def _wrap(fun):
         # pylint: disable=C0111
         fun.event = event
         fun.states = states
         return fun
-    return _wrap
 
+    return _wrap
