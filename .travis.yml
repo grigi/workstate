@@ -1,5 +1,9 @@
 language: python
 dist: focal
+addons:
+  apt:
+    packages:
+      - graphviz
 python:
   - 3.7
   - 3.8
@@ -11,8 +15,6 @@ install:
 script:
   - export TOX_ENV=`echo $TRAVIS_PYTHON_VERSION | sed -E 's/^([0-9])\.([0-9]+)$/py\1\2/'`
   - tox -e $TOX_ENV
-before_install:
-  - sudo apt-get install -y graphviz
 after_success:
   - coveralls
 
