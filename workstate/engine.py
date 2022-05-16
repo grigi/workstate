@@ -1,9 +1,10 @@
 '''WorkState engine'''
 from __future__ import annotations
-from typing import Dict
-from collections import namedtuple
 
-from workstate.docgen import Digraph, BGCOLORS, FGCOLORS
+from collections import namedtuple
+from typing import Dict
+
+from workstate.docgen import BGCOLORS, FGCOLORS, Digraph
 
 __all__ = ['Engine', 'Scope', 'BrokenStateModelException', 'trigger']
 
@@ -12,7 +13,7 @@ class BrokenStateModelException(Exception):
     pass
 
 
-# Convert to Enums
+# TODO: Use dataclasses
 State = namedtuple('State', 'scope state source_edges dest_edges triggers doc')
 Transition = namedtuple('Transition', 'scope from_state to_state condition doc')
 Event = namedtuple('Event', 'event transitions triggers doc')
@@ -22,11 +23,11 @@ Trigger = namedtuple('Trigger', 'name event states condition doc')
 class States:
     '''State container'''
 
-    def __init__(self, scope: str|None) -> None:
+    def __init__(self, scope: str | None) -> None:
         self.scope = scope
         self.states: Dict[str, State] = {}
 
-    def fullname(self, name: str, scope: str|None=None) -> str:
+    def fullname(self, name: str, scope: str | None = None) -> str:
         '''Returns canonical name'''
         if ':' in name:
             return name
@@ -37,7 +38,7 @@ class States:
             else:
                 return scope + ':' + name
 
-    def ensure_state(self, name: str, doc: str|None=None) -> State:
+    def ensure_state(self, name: str, doc: str | None = None) -> State:
         '''Ensures that a state exists'''
         fqsn = self.fullname(name)
 
@@ -50,7 +51,7 @@ class States:
     def merge_state(self, obj):
         self.ensure_state(obj.scope + ':' + obj.state, obj.doc)
 
-    def get_state(self, name: str, scope: str|None=None) -> State:
+    def get_state(self, name: str, scope: str | None = None) -> State:
         '''Return state object'''
         return self.states[self.fullname(name, scope)]
 
@@ -104,11 +105,11 @@ class Transitions:
 class Events:
     '''Event container'''
 
-    def __init__(self, transs):
-        self.transs = transs
-        self.events = {}
+    def __init__(self, transs: Transitions) -> None:
+        self.transs: Transitions = transs
+        self.events: Dict[str, Event] = {}
 
-    def update_event(self, name, transitions, doc=None):
+    def update_event(self, name: str, transitions: Transitions, doc=None) -> Event:
         '''Create/Update event with provided transitions'''
         _transitions = []
         for tran in transitions:
@@ -600,7 +601,7 @@ class Engine(metaclass=EngineMeta):
         dot = Digraph()
 
         for idx, scope in enumerate(cls.get_scopes()):
-            dot.body.append('subgraph cluster_%s {' % idx)
+            dot.body.append(f'subgraph cluster_{idx} {{')
             dot.body.append(f'label="{scope.get_scope().title()}"')
             dot.body.append(f'color="{FGCOLORS[idx + 1]}"')
             scope.graph_scope(dot, col=idx + 1)

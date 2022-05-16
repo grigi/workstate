@@ -1,8 +1,10 @@
 '''Documentation generation module for WorkState'''
 from __future__ import annotations
+
+from subprocess import PIPE, Popen
 from typing import Dict
 
-import subprocess
+__all__ = ('FGCOLORS', 'BGCOLORS', 'Digraph')
 
 FGCOLORS = ['#333333', '#1b9e77', '#d95f02', '#7570b3', '#e7298a', '#66a61e', '#e6ab02', '#a6761d']
 BGCOLORS = ['#dddddd', '#b3e2cd', '#fdcdac', '#cbd5e8', '#f4cae4', '#e6f5c9', '#fff2ae', '#f1e2cc']
@@ -46,8 +48,10 @@ class Digraph:
     def render(self, filename: str) -> None:
         '''Renders graph to filename as a PNG'''
         data = str(self).encode('utf-8')
-        proc = subprocess.Popen(['dot', '-Tpng'], stdout=subprocess.PIPE, stdin=subprocess.PIPE)
-        image = proc.communicate(input=data)[0]
-        outf = open(filename, 'wb')
-        outf.write(image)
-        outf.close()
+
+        with Popen(['dot', '-Tpng'], stdout=PIPE, stdin=PIPE) as proc:
+            image = proc.communicate(input=data)[0]
+
+        with open(filename, 'wb') as outf:
+            outf.write(image)
+            outf.close()

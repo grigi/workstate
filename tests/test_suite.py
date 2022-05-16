@@ -1,13 +1,12 @@
 '''WorkState test suite'''
 import os
 import subprocess
+import unittest
 import uuid
 from typing import Set
 
 from workstate.docgen import Digraph
-from workstate.engine import Engine, Scope, BrokenStateModelException, trigger
-
-import unittest
+from workstate.engine import BrokenStateModelException, Engine, Scope, trigger
 
 # pylint: disable=C1001,W0232,C0111,R0903
 
