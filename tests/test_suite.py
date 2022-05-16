@@ -8,7 +8,7 @@ from typing import Set
 from workstate.docgen import Digraph
 from workstate.engine import BrokenStateModelException, Engine, Scope, trigger
 
-# pylint: disable=C1001,W0232,C0111,R0903
+# pylint: disable=W0105,C0111,R0903,W0612,C0104
 
 """
 class Chapter(Scope):
@@ -293,7 +293,8 @@ class ScopeTest(unittest.TestCase):
         Scope1.validate()
         fname = f'/tmp/{uuid.uuid4()}.png'
         Scope1.graph().render(fname)
-        result = subprocess.Popen(['file', fname], stdout=subprocess.PIPE).communicate()[0]
+        with subprocess.Popen(['file', fname], stdout=subprocess.PIPE) as pipe:
+            result = pipe.communicate()[0]
         os.remove(fname)
         self.assertIn('PNG image', result.decode('UTF-8'))
 
@@ -369,7 +370,7 @@ class ScopeTest(unittest.TestCase):
 
             class Triggers:
                 @trigger('goo', ['second'])
-                def check_complete(self):
+                def check_complete(self) -> bool:
                     return True
 
         with self.assertRaisesRegex(BrokenStateModelException, "Event.*contains no transitions"):
@@ -492,7 +493,8 @@ class EngineTest(unittest.TestCase):
 
         fname = f'/tmp/{uuid.uuid4()}.png'
         TestEngine.graph().render(fname)
-        result = subprocess.Popen(['file', fname], stdout=subprocess.PIPE).communicate()[0]
+        with subprocess.Popen(['file', fname], stdout=subprocess.PIPE) as pipe:
+            result = pipe.communicate()[0]
         os.remove(fname)
         self.assertIn('PNG image', result.decode('UTF-8'))
 

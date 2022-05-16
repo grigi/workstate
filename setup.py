@@ -9,17 +9,17 @@ setup(
     name='workstate',
     version=workstate.VERSION,
     description=workstate.__doc__,
-    long_description=open('README.rst').read(),
+    long_description=open('README.rst').read(),  # pylint: disable=R1732,W1514
     author='Nickolas Grigoriadis',
     author_email='nagrigoriadis@gmail.com',
     url='https://github.com/grigi/workstate',
     license='MIT',
-    zip_safe=False,
-    test_suite='tests',
+    zip_safe=True,
+    # test_suite='tests',
 
     # Dependencies
-    install_requires=[],
-    tests_require=[],
+    # install_requires=[],
+    # tests_require=[],
 
     # Packages
     packages=['workstate'],

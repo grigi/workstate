@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 from collections import namedtuple
-from typing import Dict
+from typing import Any, Callable, Dict, List, Set, TypeVar
 
 from workstate.docgen import BGCOLORS, FGCOLORS, Digraph
 
 __all__ = ['Engine', 'Scope', 'BrokenStateModelException', 'trigger']
+
+
+ConditionType = TypeVar('ConditionType', bound=Callable[[Any], bool])  # pylint: disable=C0103
 
 
 class BrokenStateModelException(Exception):
@@ -31,10 +34,7 @@ class States:
         '''Returns canonical name'''
         if ':' in name:
             return name
-        _scope = self.scope
-        if _scope:
-            return self.scope + ':' + name
-        return scope + ':' + name
+        return f'{self.scope or scope}:{name}'
 
     def ensure_state(self, name: str, doc: str | None = None) -> State:
         '''Ensures that a state exists'''
@@ -46,7 +46,7 @@ class States:
 
         return self.states[fqsn]
 
-    def merge_state(self, obj):
+    def merge_state(self, obj: State) -> None:
         '''Merge an external state into this one'''
         self.ensure_state(obj.scope + ':' + obj.state, obj.doc)
 
@@ -61,21 +61,24 @@ class States:
 class Transitions:
     '''Transition container'''
 
-    def __init__(self, scope, states):
+    def __init__(self, scope: str | None, states: States) -> None:
         self.scope = scope
         self.states = states
-        self.transitions = {}
+        self.transitions: Dict[str, Transition] = {}
 
-    def fullname(self, name):
-        '''Returne canonical name'''
+    def fullname(self, name: str) -> str:
+        '''Return canonical name'''
         if ':' in name:
             return name
         (from_state, to_state) = name.split('__')
         if not from_state or from_state == '_Transitions':
             from_state = '*'
-        return self.scope + ':' + from_state + '__' + to_state
+        return f'{self.scope}:{from_state}__{to_state}'
 
-    def ensure_transition(self, name, condition=None, doc=None):
+    def ensure_transition(self,
+                          name: str,
+                          condition: ConditionType | None = None,
+                          doc: str | None = None) -> str:
         '''Ensures that a transition exists'''
         fqsn = self.fullname(name)
 
@@ -91,13 +94,13 @@ class Transitions:
 
         return fqsn
 
-    def merge_transition(self, obj):
+    def merge_transition(self, obj: Transition) -> None:
         '''Marge an external transition into this one'''
         self.ensure_transition(
             obj.scope + ':' + obj.from_state + '__' + obj.to_state, obj.condition, obj.doc
         )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(self.transitions)
 
 
@@ -105,10 +108,10 @@ class Events:
     '''Event container'''
 
     def __init__(self, transs: Transitions) -> None:
-        self.transs: Transitions = transs
+        self.transs = transs
         self.events: Dict[str, Event] = {}
 
-    def update_event(self, name: str, transitions: Transitions, doc=None) -> Event:
+    def update_event(self, name: str, transitions: List[str], doc: str | None = None) -> Event:
         '''Create/Update event with provided transitions'''
         _transitions = []
         for tran in transitions:
@@ -121,23 +124,28 @@ class Events:
 
         return event
 
-    def merge_event(self, obj):
+    def merge_event(self, obj: Event) -> None:
         '''Merge an external event into this one'''
         self.update_event(obj.event, obj.transitions, obj.doc)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(self.events)
 
 
 class Triggers:
     '''Trigger container'''
 
-    def __init__(self, events, states):
+    def __init__(self, events: Events, states: States) -> None:
         self.events = events
         self.states = states
-        self.triggers = {}
+        self.triggers: Dict[str, Trigger] = {}
 
-    def add_trigger(self, name, event, states, condition, doc=None):
+    def add_trigger(self,
+                    name: str,
+                    event: str,
+                    states: List[str],
+                    condition: ConditionType | None,
+                    doc: str | None = None) -> None:
         '''Add a trigger condition'''
         name = self.states.fullname(name)
         scope = name.split(':')[0]
@@ -158,14 +166,14 @@ class Triggers:
         '''Merge a Trigger into this one'''
         self.add_trigger(obj.name, obj.event, obj.states, obj.condition, obj.doc)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(self.triggers)
 
 
 class ScopeMeta(type):
     '''Meta-Class for Scope'''
 
-    def __new__(mcs, name, parents, dct):
+    def __new__(mcs, name: str, parents: tuple, dct: dict) -> type:
         if '__the_base_class__' not in dct:
             # create a class_id if it's not specified
             if 'scope' not in dct:
@@ -243,27 +251,27 @@ class Scope(metaclass=ScopeMeta):
     __the_base_class__ = True
 
     @classmethod
-    def get_parsed(cls):
+    def get_parsed(cls) -> dict:
         '''returns the parsed translation lookup'''
-        return getattr(cls, '__parsed')
+        return getattr(cls, '__parsed')  # type: ignore
 
     @classmethod
-    def get_initial(cls):
+    def get_initial(cls) -> str | None:
         '''Returns the initial state'''
         return getattr(cls, 'initial', None)
 
     @classmethod
-    def get_scope(cls):
+    def get_scope(cls) -> str:
         '''Returns the current scope'''
-        return getattr(cls, 'scope')
+        return getattr(cls, 'scope')  # type: ignore
 
     @classmethod
-    def get_event_map(cls):
+    def get_event_map(cls) -> Dict[str, List[str]]:
         '''Maps edges to transitions'''
         _events = cls.get_parsed()['events'].events
         _transitions = cls.get_parsed()['transs']
 
-        events = {}
+        events: Dict[str, List[str]] = {}
         for event in _events.values():
             for _trans in event.transitions:
                 trans = _transitions.fullname(_trans)
@@ -273,7 +281,7 @@ class Scope(metaclass=ScopeMeta):
         return events
 
     @classmethod
-    def validate(cls):
+    def validate(cls) -> None:
         '''Validates the Scope'''
         scope = cls.get_scope()
         _states = cls.get_parsed()['states'].states
@@ -300,8 +308,8 @@ class Scope(metaclass=ScopeMeta):
             pool = set(_states.keys())
             order = []
 
-            def mark_states(statename):
-                '''Recursivley mark states that are accesible'''
+            def mark_states(statename: str) -> None:
+                '''Recursively mark states that are accessible'''
                 if statename in pool:
                     pool.remove(statename)
                     order.append(statename)
@@ -329,13 +337,13 @@ class Scope(metaclass=ScopeMeta):
                 )
 
     @classmethod
-    def order_states(cls):
+    def order_states(cls) -> List[str]:
         '''Orders states from initial to end-states if initial is set'''
-        states = cls.get_parsed()['states'].states
+        states: Dict[str, State] = cls.get_parsed()['states'].states
         initial = cls.get_initial()
 
         if initial is None:
-            return states.keys()
+            return list(states.keys())
 
         pool = set(states.keys())
         order = []
@@ -343,7 +351,7 @@ class Scope(metaclass=ScopeMeta):
         scope = cls.get_scope()
         events = cls.get_event_map()
 
-        def mark_states(statename):
+        def mark_states(statename: str) -> None:
             '''Recursivley mark states that are accesible'''
             if statename in pool:
                 pool.remove(statename)
@@ -369,7 +377,7 @@ class Scope(metaclass=ScopeMeta):
         return order
 
     @classmethod
-    def graph_scope(cls, dot=None, col=0) -> Digraph:
+    def graph_scope(cls, dot: Digraph | None = None, col: int = 0) -> Digraph:
         '''Generates dot graph for provided scope'''
         if not dot:
             dot = Digraph()
@@ -381,7 +389,7 @@ class Scope(metaclass=ScopeMeta):
             a.event: (b, a.states) for b, a in cls.get_parsed()['trigrs'].triggers.items()
         }
 
-        def canon(val, scope=None):
+        def canon(val: str, scope: str | None = None) -> str:
             '''Returns canonical edge name'''
             if ':' in val:
                 return val
@@ -467,7 +475,7 @@ class Scope(metaclass=ScopeMeta):
         return dot
 
     @classmethod
-    def graph_triggers(cls, dot, col=0):
+    def graph_triggers(cls, dot: Digraph, col: int = 0) -> Digraph:
         '''Generates dot graph for non-edge triggers'''
         transitions = cls.get_parsed()['transs'].transitions
         events = cls.get_event_map()
@@ -475,7 +483,7 @@ class Scope(metaclass=ScopeMeta):
             a.event: (b, a.states) for b, a in cls.get_parsed()['trigrs'].triggers.items()
         }
 
-        def canon(val):
+        def canon(val: str) -> str:
             '''Returns canonical edge name'''
             if ':' in val:
                 return val
@@ -500,7 +508,10 @@ class Scope(metaclass=ScopeMeta):
         return dot
 
     @classmethod
-    def graph(cls, dot=None, col=0, trigger_edges=False) -> Digraph:
+    def graph(cls,
+              dot: Digraph | None = None,
+              col: int = 0,
+              trigger_edges: bool = False) -> Digraph:
         '''Generates dot graph for provided scope'''
         dot = cls.graph_scope(dot, col)
         if trigger_edges:
@@ -512,7 +523,7 @@ class Scope(metaclass=ScopeMeta):
 class EngineMeta(type):
     '''Meta-Class for Engine'''
 
-    def __new__(mcs, name, parents, dct):
+    def __new__(mcs, name: str, parents: tuple, dct: dict) -> type:
         if '__the_base_class__' not in dct:
             if 'scopes' not in dct or not isinstance(dct['scopes'], list):
                 raise BrokenStateModelException("Engine needs scopes defined as a scope list")
@@ -520,13 +531,14 @@ class EngineMeta(type):
                 if '__parsed' not in dir(scope):
                     raise BrokenStateModelException("Engine needs scopes defined as a scope list")
 
-            _scopes = dct['scopes']
-            scopes = {}
+            _scopes: List[Scope] = dct['scopes']
+            scopes: Dict[str, str | None] = {}
             states = States(None)
             transs = Transitions(None, states)
             events = Events(transs)
             triggers = Triggers(events, states)
 
+            # TODO: This should be a dataclass
             dct['__parsed'] = {
                 'scopes': scopes,
                 'states': states,
@@ -558,11 +570,11 @@ class EngineMeta(type):
                     scopes[_name] = None
 
         # we need to call type.__new__ to complete the initialization
-        cls = type.__new__(mcs, name, parents, dct)
+        cls: Engine = type.__new__(mcs, name, parents, dct)  # type: ignore
         if '__the_base_class__' not in dct:
             # Validate the Engine to ensure it is sane
             cls.validate()
-        return cls
+        return cls  # type: ignore
 
 
 class Engine(metaclass=EngineMeta):
@@ -571,22 +583,22 @@ class Engine(metaclass=EngineMeta):
     __the_base_class__ = True
 
     @classmethod
-    def get_parsed(cls):
+    def get_parsed(cls) -> dict:
         '''returns the parsed translation lookup'''
-        return getattr(cls, '__parsed')
+        return getattr(cls, '__parsed')  # type: ignore
 
     @classmethod
-    def get_scopes(cls):
+    def get_scopes(cls) -> List[Scope]:
         '''Returns the current scope'''
-        return getattr(cls, 'scopes')
+        return getattr(cls, 'scopes')  # type: ignore
 
     @classmethod
-    def get_event_map(cls):
+    def get_event_map(cls) -> Dict[str, List[str]]:
         '''Maps edges to transitions'''
         _events = cls.get_parsed()['events'].events
         _transitions = cls.get_parsed()['transs']
 
-        events = {}
+        events: Dict[str, List[str]] = {}
         for event in _events.values():
             for _trans in event.transitions:
                 trans = _transitions.fullname(_trans)
@@ -596,7 +608,7 @@ class Engine(metaclass=EngineMeta):
         return events
 
     @classmethod
-    def graph(cls):
+    def graph(cls) -> Digraph:
         '''Generates dot graph for whole engine'''
         # TODO: build graph from merged __parsed
         dot = Digraph()
@@ -613,20 +625,20 @@ class Engine(metaclass=EngineMeta):
         return dot
 
     @classmethod
-    def validate(cls):
+    def validate(cls) -> None:
         '''Validates the WorkState Engine'''
 
         # TODO: validate against own merged __parsed
         # Validate nodes, edges and states
-        for scope in cls.get_scopes():
-            scope.validate()
+        for _scope in cls.get_scopes():
+            _scope.validate()
 
         # TODO: Validate triggers
 
-        _scopes = cls.get_parsed()['scopes']
-        _states = cls.get_parsed()['states'].states
-        _transitions = cls.get_parsed()['transs']
-        _events = cls.get_parsed()['events'].events
+        _scopes: Dict[str, str | None] = cls.get_parsed()['scopes']
+        _states: Dict[str, State] = cls.get_parsed()['states'].states
+        _transitions: Transitions = cls.get_parsed()['transs']
+        _events: Dict[str, Event] = cls.get_parsed()['events'].events
         events = cls.get_event_map()
 
         # Check that each edge has an event that can trigger it
@@ -642,7 +654,7 @@ class Engine(metaclass=EngineMeta):
             if not val.transitions:
                 raise BrokenStateModelException(f"Event {key} contains no transitions")
 
-        def mark_states(statename, pool, order):
+        def mark_states(statename: str, pool: Set[str], order: List[str]) -> None:
             '''Recursively mark states that are accessible'''
             if statename in pool:
                 pool.remove(statename)
@@ -657,7 +669,7 @@ class Engine(metaclass=EngineMeta):
         for scope, initial in _scopes.items():
             if initial:
                 pool = {a for a, b in _states.items() if b.scope == scope}
-                order = []
+                order: List[str] = []
 
                 mark_states(scope + ':' + initial, pool, order)
 
@@ -677,13 +689,13 @@ class Engine(metaclass=EngineMeta):
                     )
 
 
-def trigger(event, states):
+def trigger(event: str, states: List[str]) -> Callable[[ConditionType], ConditionType]:
     '''Annotates the condition function with event and states attributes'''
 
-    def _wrap(fun):
+    def _wrap(fun: ConditionType) -> ConditionType:
         # pylint: disable=C0111
-        fun.event = event
-        fun.states = states
+        fun.event = event  # type: ignore
+        fun.states = states  # type: ignore
         return fun
 
     return _wrap

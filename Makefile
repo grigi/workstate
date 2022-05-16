@@ -25,6 +25,7 @@ test:
 _lint:
 	flake8 ${PATHS}
 	mypy ${PATHS}
+	pylint ${PATHS}
 
 pretty: deps
 	isort ${PATHS}
