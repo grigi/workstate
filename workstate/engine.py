@@ -10,7 +10,7 @@ __all__ = ['Engine', 'Scope', 'BrokenStateModelException', 'trigger']
 
 
 class BrokenStateModelException(Exception):
-    pass
+    '''State model is broken'''
 
 
 # TODO: Use dataclasses
@@ -31,24 +31,23 @@ class States:
         '''Returns canonical name'''
         if ':' in name:
             return name
-        else:
-            _scope = self.scope
-            if _scope:
-                return self.scope + ':' + name
-            else:
-                return scope + ':' + name
+        _scope = self.scope
+        if _scope:
+            return self.scope + ':' + name
+        return scope + ':' + name
 
     def ensure_state(self, name: str, doc: str | None = None) -> State:
         '''Ensures that a state exists'''
         fqsn = self.fullname(name)
 
-        if fqsn not in self.states.keys():
+        if fqsn not in self.states:
             (scope, state) = fqsn.split(':')
             self.states[fqsn] = State(scope, state, [], [], [], doc)
 
         return self.states[fqsn]
 
     def merge_state(self, obj):
+        '''Merge an external state into this one'''
         self.ensure_state(obj.scope + ':' + obj.state, obj.doc)
 
     def get_state(self, name: str, scope: str | None = None) -> State:
@@ -71,17 +70,16 @@ class Transitions:
         '''Returne canonical name'''
         if ':' in name:
             return name
-        else:
-            (from_state, to_state) = name.split('__')
-            if not from_state or from_state == '_Transitions':
-                from_state = '*'
-            return self.scope + ':' + from_state + '__' + to_state
+        (from_state, to_state) = name.split('__')
+        if not from_state or from_state == '_Transitions':
+            from_state = '*'
+        return self.scope + ':' + from_state + '__' + to_state
 
     def ensure_transition(self, name, condition=None, doc=None):
         '''Ensures that a transition exists'''
         fqsn = self.fullname(name)
 
-        if fqsn not in self.transitions.keys():
+        if fqsn not in self.transitions:
             (scope, edge) = fqsn.split(':')
             (from_state, to_state) = edge.split('__')
             if from_state != '*':
@@ -94,6 +92,7 @@ class Transitions:
         return fqsn
 
     def merge_transition(self, obj):
+        '''Marge an external transition into this one'''
         self.ensure_transition(
             obj.scope + ':' + obj.from_state + '__' + obj.to_state, obj.condition, obj.doc
         )
@@ -123,6 +122,7 @@ class Events:
         return event
 
     def merge_event(self, obj):
+        '''Merge an external event into this one'''
         self.update_event(obj.event, obj.transitions, obj.doc)
 
     def __repr__(self):
@@ -154,7 +154,8 @@ class Triggers:
             except KeyError:
                 pass
 
-    def merge_trigger(self, obj):
+    def merge_trigger(self, obj: Trigger) -> None:
+        '''Merge a Trigger into this one'''
         self.add_trigger(obj.name, obj.event, obj.states, obj.condition, obj.doc)
 
     def __repr__(self):
@@ -217,10 +218,10 @@ class ScopeMeta(type):
                                 raise IndexError
                             edges = [a for a in val if isinstance(a, list)][0]
                             doc = [a for a in val if isinstance(a, str)][0]
-                        except IndexError:
+                        except IndexError as exc:
                             raise BrokenStateModelException(
                                 'Events need to be one of: [], ("",[]), ([],"")'
-                            )
+                            ) from exc
                         events.update_event(key, edges, doc)
 
             if 'Triggers' in dct:
@@ -313,7 +314,7 @@ class Scope(metaclass=ScopeMeta):
             mark_states(scope + ':' + initial)
 
             # Wildcard states
-            for event in events.keys():
+            for event in events:
                 (from_state, to_state) = event.split('__')
                 if '*' in from_state:
                     for _state in list(pool):
@@ -332,39 +333,40 @@ class Scope(metaclass=ScopeMeta):
         '''Orders states from initial to end-states if initial is set'''
         states = cls.get_parsed()['states'].states
         initial = cls.get_initial()
-        if initial:
-            pool = set(states.keys())
-            order = []
-            transitions = cls.get_parsed()['transs'].transitions
-            scope = cls.get_scope()
-            events = cls.get_event_map()
 
-            def mark_states(statename):
-                '''Recursivley mark states that are accesible'''
-                if statename in pool:
-                    pool.remove(statename)
-                    order.append(statename)
-                state = states[statename]
-                dest_edges = [transitions[edge] for edge in state.dest_edges]
-                dest_states = [a.scope + ':' + a.to_state for a in dest_edges]
-                for substate in set(dest_states).intersection(pool):
-                    mark_states(substate)
-
-            mark_states(scope + ':' + initial)
-
-            # Wildcard states go last
-            for event in events.keys():
-                (from_state, to_state) = event.split('__')
-                if '*' in from_state:
-                    for _state in list(pool):
-                        (scope, state) = _state.split(':')
-                        if state == to_state:
-                            pool.remove(_state)
-                            order.append(_state)
-
-            return order
-        else:
+        if initial is None:
             return states.keys()
+
+        pool = set(states.keys())
+        order = []
+        transitions = cls.get_parsed()['transs'].transitions
+        scope = cls.get_scope()
+        events = cls.get_event_map()
+
+        def mark_states(statename):
+            '''Recursivley mark states that are accesible'''
+            if statename in pool:
+                pool.remove(statename)
+                order.append(statename)
+            state = states[statename]
+            dest_edges = [transitions[edge] for edge in state.dest_edges]
+            dest_states = [a.scope + ':' + a.to_state for a in dest_edges]
+            for substate in set(dest_states).intersection(pool):
+                mark_states(substate)
+
+        mark_states(scope + ':' + initial)
+
+        # Wildcard states go last
+        for event in events:
+            (from_state, to_state) = event.split('__')
+            if '*' in from_state:
+                for _state in list(pool):
+                    (scope, state) = _state.split(':')
+                    if state == to_state:
+                        pool.remove(_state)
+                        order.append(_state)
+
+        return order
 
     @classmethod
     def graph_scope(cls, dot=None, col=0) -> Digraph:
@@ -385,8 +387,7 @@ class Scope(metaclass=ScopeMeta):
                 return val
             if scope:
                 return scope + ':' + val
-            else:
-                return cls.get_scope() + ':' + val
+            return cls.get_scope() + ':' + val
 
         for fullstate in cls.order_states():
             state = fullstate.split(':')[1]
@@ -546,15 +547,15 @@ class EngineMeta(type):
                 for event in spar['events'].events.values():
                     events.merge_event(event)
 
-                for trigger in spar['trigrs'].triggers.values():
-                    triggers.merge_trigger(trigger)
+                for _trigger in spar['trigrs'].triggers.values():
+                    triggers.merge_trigger(_trigger)
 
             scopenames = {a.scope for a in states.states.values()}
-            for name in scopenames:
+            for _name in scopenames:
                 try:
-                    scopes[name] = [a.get_initial() for a in _scopes if a.get_scope() == name][0]
+                    scopes[_name] = [a.get_initial() for a in _scopes if a.get_scope() == _name][0]
                 except IndexError:
-                    scopes[name] = None
+                    scopes[_name] = None
 
         # we need to call type.__new__ to complete the initialization
         cls = type.__new__(mcs, name, parents, dct)
@@ -614,12 +615,13 @@ class Engine(metaclass=EngineMeta):
     @classmethod
     def validate(cls):
         '''Validates the WorkState Engine'''
-        '''# TODO: validate against own merged __parsed
+
+        # TODO: validate against own merged __parsed
         # Validate nodes, edges and states
         for scope in cls.get_scopes():
             scope.validate()
 
-        # TODO: Validate triggers'''
+        # TODO: Validate triggers
 
         _scopes = cls.get_parsed()['scopes']
         _states = cls.get_parsed()['states'].states
@@ -640,27 +642,27 @@ class Engine(metaclass=EngineMeta):
             if not val.transitions:
                 raise BrokenStateModelException(f"Event {key} contains no transitions")
 
+        def mark_states(statename, pool, order):
+            '''Recursively mark states that are accessible'''
+            if statename in pool:
+                pool.remove(statename)
+                order.append(statename)
+            state = _states[statename]
+            dest_edges = [_transitions.transitions[edge] for edge in state.dest_edges]
+            dest_states = [a.scope + ':' + a.to_state for a in dest_edges]
+            for substate in set(dest_states).intersection(pool):
+                mark_states(substate, pool, order)
+
         # Check that all states are connected
         for scope, initial in _scopes.items():
             if initial:
                 pool = {a for a, b in _states.items() if b.scope == scope}
                 order = []
 
-                def mark_states(statename):
-                    '''Recursivley mark states that are accesible'''
-                    if statename in pool:
-                        pool.remove(statename)
-                        order.append(statename)
-                    state = _states[statename]
-                    dest_edges = [_transitions.transitions[edge] for edge in state.dest_edges]
-                    dest_states = [a.scope + ':' + a.to_state for a in dest_edges]
-                    for substate in set(dest_states).intersection(pool):
-                        mark_states(substate)
-
-                mark_states(scope + ':' + initial)
+                mark_states(scope + ':' + initial, pool, order)
 
                 # Wildcard states
-                for event in events.keys():
+                for event in events:
                     (from_state, to_state) = event.split('__')
                     if '*' in from_state:
                         for _state in list(pool):
@@ -671,8 +673,7 @@ class Engine(metaclass=EngineMeta):
 
                 if pool:
                     raise BrokenStateModelException(
-                        "States %s not reachable from initial state in scope %s"
-                        % (list(pool), scope)
+                        f"States {list(pool)} not reachable from initial state in scope {scope}"
                     )
 
 
