@@ -21,3 +21,4 @@ green
 tox
 docutils
 pygments
+coveralls
