@@ -220,7 +220,7 @@ class ScopeTest(unittest.TestCase):
                 second = 'The second'
                 do_it = 'Yup, you gotta DO it'
 
-        states = Scope1.get_parsed()['states'].states
+        states = Scope1.get_parsed().states.states
         # Check that states are there
         self.assertEqual(set(states.keys()), {'scope1:first', 'scope1:second', 'scope1:do_it'})
         # Check that docs got transferred
