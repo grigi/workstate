@@ -11,6 +11,22 @@ from workstate.exceptions import BrokenStateModelException
 __all__ = ['Engine', 'Scope', 'BrokenStateModelException', 'trigger']
 
 
+def mark_states(_states: Dict[str, State],
+                _transitions: Transitions,
+                statename: str,
+                pool: Set[str],
+                order: List[str]) -> None:
+    '''Recursively mark states that are accessible'''
+    if statename in pool:
+        pool.remove(statename)
+        order.append(statename)
+    state = _states[statename]
+    dest_edges = [_transitions.transitions[edge] for edge in state.dest_edges]
+    dest_states = [f'{a.scope}:{a.to_state}' for a in dest_edges]
+    for substate in set(dest_states).intersection(pool):
+        mark_states(_states, _transitions, substate, pool, order)
+
+
 class ScopeMeta(type):
     '''Meta-Class for Scope'''
 
@@ -140,20 +156,9 @@ class Scope(metaclass=ScopeMeta):
         initial = cls.get_initial()
         if initial:
             pool = set(_states.keys())
-            order = []
+            order: List[str] = []
 
-            def mark_states(statename: str) -> None:
-                '''Recursively mark states that are accessible'''
-                if statename in pool:
-                    pool.remove(statename)
-                    order.append(statename)
-                state = _states[statename]
-                dest_edges = [_transitions.transitions[edge] for edge in state.dest_edges]
-                dest_states = [a.scope + ':' + a.to_state for a in dest_edges]
-                for substate in set(dest_states).intersection(pool):
-                    mark_states(substate)
-
-            mark_states(scope + ':' + initial)
+            mark_states(_states, _transitions, f'{scope}:{initial}', pool, order)
 
             # Wildcard states
             for event in events:
@@ -180,23 +185,12 @@ class Scope(metaclass=ScopeMeta):
             return list(states.keys())
 
         pool = set(states.keys())
-        order = []
-        transitions = cls.get_parsed().transitions.transitions
+        order: List[str] = []
+        transitions = cls.get_parsed().transitions
         scope = cls.get_scope()
         events = cls.get_event_map()
 
-        def mark_states(statename: str) -> None:
-            '''Recursivley mark states that are accesible'''
-            if statename in pool:
-                pool.remove(statename)
-                order.append(statename)
-            state = states[statename]
-            dest_edges = [transitions[edge] for edge in state.dest_edges]
-            dest_states = [a.scope + ':' + a.to_state for a in dest_edges]
-            for substate in set(dest_states).intersection(pool):
-                mark_states(substate)
-
-        mark_states(scope + ':' + initial)
+        mark_states(states, transitions, f'{scope}:{initial}', pool, order)
 
         # Wildcard states go last
         for event in events:
@@ -227,9 +221,7 @@ class Scope(metaclass=ScopeMeta):
             '''Returns canonical edge name'''
             if ':' in val:
                 return val
-            if scope:
-                return scope + ':' + val
-            return cls.get_scope() + ':' + val
+            return f'{scope or cls.get_scope()}:{val}'
 
         for fullstate in cls.order_states():
             state = fullstate.split(':')[1]
@@ -263,9 +255,7 @@ class Scope(metaclass=ScopeMeta):
                         style = "dashed" if edge.condition else "solid"
                         if _trigger:
                             tname = _trigger[0].split(':')[1]
-                            pretty = (
-                                pevent + ' <SUP><FONT POINT-SIZE="10">(' + tname + ')</FONT></SUP>'
-                            )
+                            pretty = f'{pevent} <SUP><FONT POINT-SIZE="10">({tname})</FONT></SUP>'
                             dot.edge(
                                 canon(edge.from_state, edge.scope),
                                 canon(edge.to_state, edge.scope),
@@ -321,7 +311,7 @@ class Scope(metaclass=ScopeMeta):
             '''Returns canonical edge name'''
             if ':' in val:
                 return val
-            return cls.get_scope() + ':' + val
+            return f'{cls.get_scope()}:{val}'
 
         for name, edge in transitions.items():
             if edge.from_state != '*':
@@ -334,7 +324,7 @@ class Scope(metaclass=ScopeMeta):
                                 dot.edge(
                                     canon(trig),
                                     canon(edge.to_state),
-                                    '<FONT POINT-SIZE="10">' + tname + '</FONT>',
+                                    f'<FONT POINT-SIZE="10">{tname}</FONT>',
                                     style="dotted",
                                     color=FGCOLORS[col],
                                 )
@@ -470,8 +460,7 @@ class Engine(metaclass=EngineMeta):
 
         # Check that each edge has an event that can trigger it
         for key, transition in _transitions.transitions.items():
-            edge = transition.scope + ':' + transition.from_state + '__' + transition.to_state
-            if not events.get(edge, None):
+            if not events.get(transition.edge, None):
                 raise BrokenStateModelException(
                     f"Transition {key} has no events that can trigger it"
                 )
@@ -481,24 +470,13 @@ class Engine(metaclass=EngineMeta):
             if not val.transitions:
                 raise BrokenStateModelException(f"Event {key} contains no transitions")
 
-        def mark_states(statename: str, pool: Set[str], order: List[str]) -> None:
-            '''Recursively mark states that are accessible'''
-            if statename in pool:
-                pool.remove(statename)
-                order.append(statename)
-            state = _states[statename]
-            dest_edges = [_transitions.transitions[edge] for edge in state.dest_edges]
-            dest_states = [a.scope + ':' + a.to_state for a in dest_edges]
-            for substate in set(dest_states).intersection(pool):
-                mark_states(substate, pool, order)
-
         # Check that all states are connected
         for scope, initial in _scopes.items():
             if initial:
                 pool = {a for a, b in _states.items() if b.scope == scope}
                 order: List[str] = []
 
-                mark_states(scope + ':' + initial, pool, order)
+                mark_states(_states, _transitions, f'{scope}:{initial}', pool, order)
 
                 # Wildcard states
                 for event in events:
