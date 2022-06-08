@@ -193,7 +193,7 @@ class ScopeTest(unittest.TestCase):
         Scope1.graph().render(fname)
         with subprocess.Popen(['file', fname], stdout=subprocess.PIPE) as pipe:
             result = pipe.communicate()[0]
-        os.remove(fname)
+        os.remove(fname)  # pylint: disable=no-member
         self.assertIn('PNG image', result.decode('UTF-8'))
 
     def test_conditional_transition(self):
